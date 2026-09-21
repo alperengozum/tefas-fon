@@ -18,7 +18,7 @@ export function classify(name: string, kind: string) {
   const founder =
     kind === "EMK" ? name.match(/^(.+?A\.Ş\.)/)?.[1] : name.match(/^(.+?)\s+PORTF[ÖO]Y/i)?.[0];
   return {
-    founder: founder ?? name.split(" ")[0],
+    founder: (founder ?? name.split(" ")[0]).replace(/\s+/g, " "), // TEFAS adlarında çift boşluk olabiliyor (GARANTİ  PORTFÖY)
     type: TYPES.find(([, re]) => re.test(n))?.[0] ?? "Diğer",
     fx: /DOVIZ/.test(n),
     islamic: /KATILIM|KIRA SERTIFIKALARI/.test(n),
