@@ -1,0 +1,12 @@
+---
+import Base from "../layouts/Base.astro";
+import FundTable from "../components/FundTable";
+---
+<Base title="Favorilerim · TEFAS Fon Analiz">
+  <link slot="head" rel="preload" href="/api/funds/all" as="fetch" crossorigin="anonymous" />
+  <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-4">
+    <h1 class="text-xl font-semibold">Favorilerim</h1>
+    <span class="text-sm text-muted-foreground">Bu tarayıcıda saklanır</span>
+  </div>
+  <FundTable client:only="react" src="/api/funds/all" favOnly />
+</Base>
