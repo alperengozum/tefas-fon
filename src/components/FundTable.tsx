@@ -2,6 +2,8 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
 import { label, pct, tl, tone } from "../lib/format";
+import { useFavorites } from "../lib/favorites";
+import { FavStar } from "./FavStar";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -43,19 +45,21 @@ function Pick({ value, onChange, all, items, className }: { value: string; onCha
 }
 
 // Liste verisi sayfaya gömülmez, ayrı (önbelleklenebilir) JSON'dan gelir; sayfa kabuğu <link rel=preload> ile erken başlatır.
-export default function FundTable({ src }: { src: string }) {
+export default function FundTable({ src, favOnly = false }: { src: string; favOnly?: boolean }) {
   const [data, setData] = useState<string | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => { fetch(src).then((r) => (r.ok ? r.text() : Promise.reject())).then(setData).catch(() => setErr(true)); }, [src]);
   if (err) return <p className="text-muted-foreground">Liste yüklenemedi; sayfayı yenileyin.</p>;
   if (data == null) return <p className="text-muted-foreground">Yükleniyor…</p>;
-  return <FundTableView data={data} />;
+  return <FundTableView data={data} favOnly={favOnly} />;
 }
 
-function FundTableView({ data }: { data: string }) {
+function FundTableView({ data, favOnly }: { data: string; favOnly: boolean }) {
   const funds = useMemo(() => decodeFunds(data), [data]);
+  const { favs, toggle } = useFavorites();
+  const empty = favOnly ? { ...EMPTY, status: "" } : EMPTY; // pasif fon da favori olabilir
   const [view, setView] = useState("getiri");
-  const [f, setF] = useState(EMPTY);
+  const [f, setF] = useState(empty);
   const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
   const [sort, setSort] = useState<{ key: keyof Fund; dir: 1 | -1 }>({ key: "size", dir: -1 });
   const [limit, setLimit] = useState(100);
@@ -92,7 +96,7 @@ function FundTableView({ data }: { data: string }) {
     const [riskMin, riskMax, invMin, invMax, sizeMin, sizeMax, stockMin] = [df.riskMin, df.riskMax, df.invMin, df.invMax, df.sizeMin, df.sizeMax, df.stockMin].map(n);
     return funds
       .filter((x) =>
-        (!s || x.hay.includes(s)) &&
+        (!favOnly || favs.has(x.code)) && (!s || x.hay.includes(s)) &&
         (!df.status || x.active === (df.status === "aktif")) && (!df.type || x.type === df.type) && (!df.founder || x.founder === df.founder) && (!df.cat || x.main === df.cat) &&
         df.flags.every((k) => x[k as keyof Fund]) &&
         (riskMin == null || (x.risk != null && x.risk >= riskMin)) && (riskMax == null || (x.risk != null && x.risk <= riskMax)) &&
@@ -104,7 +108,7 @@ function FundTableView({ data }: { data: string }) {
         const x = a[sort.key] as any, y = b[sort.key] as any;
         return (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
       });
-  }, [funds, df, sort, byStock]);
+  }, [funds, df, sort, byStock, favOnly, favs]);
 
   // Kategori bazında net nakit girişi (1 ay), filtrelenmiş fonlar üzerinden
   const byCat = useMemo(() => {
@@ -120,7 +124,7 @@ function FundTableView({ data }: { data: string }) {
     return () => io.disconnect(); // limit değişince yeniden kurulur; gözcü hâlâ görünüyorsa tekrar tetiklenir
   }, [rows.length, limit]);
 
-  const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
+  const active = JSON.stringify(f) !== JSON.stringify(empty);
   const stockCol: Col[] = byStock && f.stock.trim().length >= 2 ? [{ key: "code", head: `${f.stock.toUpperCase()} %`, fmt: () => "" }] : [];
   const cols = VIEWS[view].cols;
   const th = (key: keyof Fund, head: string, right = true) => (
@@ -153,7 +157,7 @@ function FundTableView({ data }: { data: string }) {
             {fl.name}
           </Button>
         ))}
-        {active && <Button size="sm" variant="ghost" onClick={() => setF(EMPTY)}>Temizle</Button>}
+        {active && <Button size="sm" variant="ghost" onClick={() => setF(empty)}>Temizle</Button>}
         {picked.length > 0 && (
           <Button className="ml-auto" onClick={() => (location.href = `/karsilastir?codes=${picked.join(",")}`)}>Karşılaştır ({picked.length})</Button>
         )}
@@ -190,11 +194,12 @@ function FundTableView({ data }: { data: string }) {
         </div>
       )}
 
+      {favOnly && favs.size === 0 && <p className="text-muted-foreground">Henüz favori fon yok. Fon listelerinde ya da fon sayfasında ★ ile ekleyin.</p>}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-8" />
+              <TableHead className="w-14" />
               {th("code", "Kod", false)}
               {th("name", "Fon", false)}
               {stockCol.length > 0 && <TableHead className="text-right whitespace-nowrap">{stockCol[0].head}</TableHead>}
@@ -205,13 +210,16 @@ function FundTableView({ data }: { data: string }) {
             {rows.slice(0, limit).map((x) => (
               <TableRow key={x.code} className="cursor-pointer"
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("input,a")) return; // onay kutusu ve kod bağlantısı kendi işini yapar
+                  if ((e.target as HTMLElement).closest("input,a,button")) return; // onay kutusu, yıldız ve kod bağlantısı kendi işini yapar
                   if (e.metaKey || e.ctrlKey) window.open(`/fon/${x.code}`, "_blank");
                   else location.href = `/fon/${x.code}`;
                 }}>
                 <TableCell>
-                  <input type="checkbox" checked={picked.includes(x.code)} disabled={!picked.includes(x.code) && picked.length >= MAX_COMPARE}
-                    onChange={(e) => setPicked(e.target.checked ? [...picked, x.code] : picked.filter((c) => c !== x.code))} />
+                  <div className="flex items-center gap-1.5">
+                    <input type="checkbox" checked={picked.includes(x.code)} disabled={!picked.includes(x.code) && picked.length >= MAX_COMPARE}
+                      onChange={(e) => setPicked(e.target.checked ? [...picked, x.code] : picked.filter((c) => c !== x.code))} />
+                    <FavStar on={favs.has(x.code)} onClick={() => toggle(x.code)} />
+                  </div>
                 </TableCell>
                 <TableCell className="font-medium"><a className="hover:underline" href={`/fon/${x.code}`}>{x.code}</a></TableCell>
                 <TableCell className="max-w-xs truncate" title={`${x.name}\n${x.founder}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge>{!x.active && <Badge variant="outline" className="ml-1 text-red-600">Pasif</Badge>}</TableCell>
