@@ -1,0 +1,65 @@
+---
+import Base from "../../layouts/Base.astro";
+import FundCharts from "../../components/FundCharts";
+import { getFund, peers } from "../../lib/db";
+import { ret, RETURNS } from "../../lib/analytics";
+import { label, pct, tl, tone } from "../../lib/format";
+
+const f = await getFund((Astro.params.code ?? "").toUpperCase());
+if (!f) return new Response("Fon bulunamadı", { status: 404 });
+const last = f.history[f.history.length - 1];
+const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
+const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
+const rivals = await peers(f.code, f.kind);
+const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
+---
+<Base title={`${f.code} · TEFAS Fon Analiz`}>
+  <div class="mb-6">
+    <div class="text-sm text-muted-foreground">{f.kind} · {last.date}</div>
+    <h1 class="text-2xl font-semibold">{f.code} <span class="text-lg font-normal text-muted-foreground">{f.name}</span></h1>
+    <a class="text-sm underline" href={`/karsilastir?codes=${f.code}`}>Karşılaştırmaya ekle</a>
+  </div>
+
+  <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+    {[["Fiyat", last.price.toFixed(4)], ["Büyüklük", tl(last.size)], ["Yatırımcı", last.investors?.toLocaleString("tr-TR")], ["Pay sayısı", tl(last.shares).replace(" ₺", "")]].map(([k, v]) => (
+      <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class="text-lg font-medium tabular-nums">{v}</div></div>
+    ))}
+  </div>
+
+  <div class="mb-6 grid grid-cols-3 gap-3 md:grid-cols-5 lg:grid-cols-9">
+    {RETURNS.map(([k, d]) => { const r = ret(f.history, d); return (
+      <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class={`font-medium tabular-nums ${tone(r)}`}>{pct(r)}</div></div>
+    ); })}
+  </div>
+
+  <div class="mb-6 grid grid-cols-3 gap-3">
+    {[["1H", 7], ["1A", 30], ["3A", 91]].map(([k, d]) => { const v = flow(d as number); return (
+      <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Net nakit akışı {k}</div><div class={`font-medium tabular-nums ${tone(v)}`}>{tl(v)}</div></div>
+    ); })}
+  </div>
+
+  <section class="mb-8"><FundCharts client:only="react" history={f.history} /></section>
+
+  <div class="grid gap-8 md:grid-cols-2">
+    <section>
+      <h2 class="mb-3 font-semibold">Varlık dağılımı <span class="text-xs font-normal text-muted-foreground">{f.allocDate}</span></h2>
+      {alloc.length === 0 ? <p class="text-sm text-muted-foreground">Veri yok.</p> : (
+        <ul class="space-y-1.5 text-sm">
+          {alloc.map(([k, v]) => (
+            <li>
+              <div class="flex justify-between"><span>{label(k)}</span><span class="tabular-nums">{v.toFixed(2)}%</span></div>
+              <div class="h-1.5 rounded bg-muted"><div class="h-1.5 rounded bg-primary" style={`width:${Math.min(v, 100)}%`} /></div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+    <section>
+      <h2 class="mb-3 font-semibold">Rakip fonlar <span class="text-xs font-normal text-muted-foreground">varlık dağılımı en benzer</span></h2>
+      <ul class="space-y-1 text-sm">
+        {rivals.map((r) => <li><a class="hover:underline" href={`/fon/${r.code}`}><b>{r.code}</b> {r.name}</a></li>)}
+      </ul>
+      {rivals.length > 0 && <a class="mt-3 inline-block text-sm underline" href={`/karsilastir?codes=${[f.code, ...rivals.slice(0, 4).map((r) => r.code)].join(",")}`}>İlk 4 rakiple karşılaştır</a>}
+    </section>
+  </div>
+</Base>

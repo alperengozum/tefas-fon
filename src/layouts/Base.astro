@@ -1,0 +1,26 @@
+---
+import "../styles/global.css";
+const { title = "TEFAS Fon Analiz" } = Astro.props;
+const tabs = [["yat", "Yatırım Fonları"], ["bes", "Emeklilik (BES)"], ["byf", "BYF"], ["gyf", "GYF"]];
+const path = Astro.url.pathname;
+---
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" href="/favicon.svg" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <header class="border-b">
+      <nav class="mx-auto flex max-w-[1700px] items-center gap-6 px-4 py-3 text-sm">
+        <a href="/" class="font-semibold">TEFAS Fon Analiz</a>
+        {tabs.map(([k, l]) => (
+          <a href={`/fonlar/${k}`} class={path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
+        ))}
+        <a href="/karsilastir" class={path === "/karsilastir" ? "font-medium" : "text-muted-foreground hover:text-foreground"}>Karşılaştır</a>
+      </nav>
+    </header>
+    <main class="mx-auto max-w-[1700px] px-4 py-6"><slot /></main>
+  </body>
+</html>

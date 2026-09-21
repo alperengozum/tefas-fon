@@ -1,0 +1,22 @@
+---
+import Base from "../../layouts/Base.astro";
+import FundTable from "../../components/FundTable";
+import { listFunds } from "../../lib/db";
+
+const KINDS: Record<string, [string, string]> = {
+  yat: ["YAT", "Yatırım Fonları"], bes: ["EMK", "Emeklilik Fonları (BES)"],
+  byf: ["BYF", "Borsa Yatırım Fonları"], gyf: ["GYF", "Gayrimenkul Yatırım Fonları"],
+};
+const k = KINDS[Astro.params.tur ?? ""];
+if (!k) return new Response(null, { status: 404 });
+const { ref, funds } = await listFunds(k[0]);
+---
+<Base title={`${k[1]} · TEFAS Fon Analiz`}>
+  <div class="mb-4 flex items-baseline justify-between">
+    <h1 class="text-xl font-semibold">{k[1]}</h1>
+    <span class="text-sm text-muted-foreground">Veri tarihi: {ref || "–"} · {funds.length} fon</span>
+  </div>
+  {funds.length === 0
+    ? <p class="text-muted-foreground">Veri yok. <code>npm run ingest</code> çalıştırın.</p>
+    : <FundTable client:load funds={funds} />}
+</Base>

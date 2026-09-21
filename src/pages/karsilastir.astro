@@ -1,0 +1,42 @@
+---
+import Base from "../layouts/Base.astro";
+import CompareChart from "../components/CompareChart";
+import { getFund } from "../lib/db";
+import { ret, RETURNS } from "../lib/analytics";
+import { label, pct, tl, tone } from "../lib/format";
+
+const codes = [...new Set((Astro.url.searchParams.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 10);
+const funds = (await Promise.all(codes.map(getFund))).filter((f) => f != null);
+const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
+  .sort((a, b) => Math.max(...funds.map((f) => f.alloc[b] ?? 0)) - Math.max(...funds.map((f) => f.alloc[a] ?? 0)));
+---
+<Base title="Fon Karşılaştırma · TEFAS Fon Analiz">
+  <h1 class="mb-4 text-xl font-semibold">Fon Karşılaştırma</h1>
+  <form class="mb-6 flex gap-2" method="get">
+    <input name="codes" value={codes.join(",")} placeholder="Fon kodları, virgülle (ör. AFT,TCD,MAC)" class="h-8 w-96 rounded-lg border bg-transparent px-2 text-sm" />
+    <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Karşılaştır</button>
+    <span class="self-center text-xs text-muted-foreground">en fazla 10 fon</span>
+  </form>
+  {funds.length === 0 ? <p class="text-muted-foreground">Fon listesinden kutucukları işaretleyin ya da kod girin.</p> : (
+    <>
+      <section class="mb-8"><CompareChart client:only="react" series={funds.map((f) => ({ code: f.code, history: f.history }))} /></section>
+      <div class="mb-8 overflow-x-auto rounded-lg border">
+        <table class="w-full text-sm">
+          <thead class="bg-muted/50 text-left"><tr><th class="p-2">Metrik</th>{funds.map((f) => <th class="p-2 text-right"><a class="hover:underline" href={`/fon/${f.code}`}>{f.code}</a></th>)}</tr></thead>
+          <tbody class="tabular-nums">
+            <tr class="border-t"><td class="p-2">Tür</td>{funds.map((f) => <td class="p-2 text-right">{f.kind}</td>)}</tr>
+            <tr class="border-t"><td class="p-2">Büyüklük</td>{funds.map((f) => <td class="p-2 text-right">{tl(f.history.at(-1)!.size)}</td>)}</tr>
+            <tr class="border-t"><td class="p-2">Yatırımcı</td>{funds.map((f) => <td class="p-2 text-right">{f.history.at(-1)!.investors?.toLocaleString("tr-TR")}</td>)}</tr>
+            {RETURNS.map(([k, d]) => (
+              <tr class="border-t"><td class="p-2">Getiri {k}</td>{funds.map((f) => { const r = ret(f.history, d); return <td class={`p-2 text-right ${tone(r)}`}>{pct(r)}</td>; })}</tr>
+            ))}
+            <tr class="border-t bg-muted/30"><td class="p-2 font-medium" colspan={funds.length + 1}>Varlık dağılımı</td></tr>
+            {keys.map((k) => (
+              <tr class="border-t"><td class="p-2">{label(k)}</td>{funds.map((f) => <td class="p-2 text-right">{f.alloc[k] ? `${f.alloc[k].toFixed(2)}%` : "–"}</td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )}
+</Base>
