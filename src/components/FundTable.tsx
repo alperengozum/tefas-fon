@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
 import { label, pct, tl, tone } from "../lib/format";
@@ -49,6 +49,8 @@ export default function FundTable({ data }: { data: string }) {
   const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
   const [sort, setSort] = useState<{ key: keyof Fund; dir: 1 | -1 }>({ key: "size", dir: -1 });
   const [limit, setLimit] = useState(100);
+  // Sonsuz kaydırma: tablonun altındaki gözcü görününce +100 satır daha çiz
+  const end = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState<string[]>([]);
   // Hisse filtresi (KAP portföy raporu): ?hisse=EREGL ile de açılır
   const [byStock, setByStock] = useState<Record<string, number> | null>(null);
@@ -100,6 +102,13 @@ export default function FundTable({ data }: { data: string }) {
     for (const x of rows) if (x.flow_m1 != null) m.set(x.type, (m.get(x.type) ?? 0) + x.flow_m1);
     return [...m].sort((a, b) => b[1] - a[1]);
   }, [rows]);
+
+  useEffect(() => {
+    if (!end.current || rows.length <= limit) return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setLimit((l) => l + 100), { rootMargin: "600px" });
+    io.observe(end.current);
+    return () => io.disconnect(); // limit değişince yeniden kurulur; gözcü hâlâ görünüyorsa tekrar tetiklenir
+  }, [rows.length, limit]);
 
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
   const stockCol: Col[] = byStock && f.stock.trim().length >= 2 ? [{ key: "code", head: `${f.stock.toUpperCase()} %`, fmt: () => "" }] : [];
@@ -204,9 +213,8 @@ export default function FundTable({ data }: { data: string }) {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>{rows.length} fon{rows.length > limit && `, ilk ${limit} gösteriliyor`}</span>
-        {rows.length > limit && <Button variant="outline" onClick={() => setLimit(limit + 200)}>Daha fazla</Button>}
+      <div ref={end} className="text-sm text-muted-foreground">
+        {rows.length} fon{rows.length > limit && `, ilk ${limit} gösteriliyor (kaydırdıkça yüklenir)`}
       </div>
     </div>
   );
