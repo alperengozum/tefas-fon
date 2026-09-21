@@ -26,7 +26,7 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
   { key: "qualified", name: "Nitelikli / Özel" }, { key: "oks", name: "OKS" },
 ];
 
-const EMPTY = { q: "", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "" };
+const EMPTY = { q: "", status: "aktif", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "" };
 const ALL = "__all"; // base-ui boş string değerini "seçim yok" sayar; "hepsi" için sabit değer kullan
 
 // Sayfa içinde çizilen (shadcn/base-ui) seçim kutusu; doğal <select> açılır listesi yerine.
@@ -83,7 +83,7 @@ export default function FundTable({ data }: { data: string }) {
     return funds
       .filter((x) =>
         (!s || x.hay.includes(s)) &&
-        (!df.type || x.type === df.type) && (!df.founder || x.founder === df.founder) && (!df.cat || x.main === df.cat) &&
+        (!df.status || x.active === (df.status === "aktif")) && (!df.type || x.type === df.type) && (!df.founder || x.founder === df.founder) && (!df.cat || x.main === df.cat) &&
         df.flags.every((k) => x[k as keyof Fund]) &&
         (riskMin == null || (x.risk != null && x.risk >= riskMin)) && (riskMax == null || (x.risk != null && x.risk <= riskMax)) &&
         (invMin == null || (x.investors ?? 0) >= invMin) && (invMax == null || (x.investors ?? 0) <= invMax) &&
@@ -130,6 +130,7 @@ export default function FundTable({ data }: { data: string }) {
       {/* hızlı filtreler */}
       <div className="flex flex-wrap items-center gap-2">
         <Input className="w-full sm:w-56" placeholder="Fon kodu veya adı…" value={f.q} onChange={(e) => set({ q: e.target.value })} />
+        <Pick className="w-full sm:w-36" value={f.status} onChange={(v) => set({ status: v })} all="Aktif + pasif" items={[{ value: "aktif", label: "TEFAS'ta aktif" }, { value: "pasif", label: "TEFAS'ta pasif" }]} />
         <Pick className="w-full sm:w-44" value={f.type} onChange={(v) => set({ type: v })} all="Tüm fon türleri" items={opts.types.map((t) => ({ value: t, label: t }))} />
         <Pick className="w-full sm:w-56" value={f.founder} onChange={(v) => set({ founder: v })} all="Tüm kurucular (PYŞ)" items={opts.founders.map((t) => ({ value: t, label: t }))} />
         <div className="flex w-full items-center gap-1 sm:w-auto">
@@ -164,7 +165,7 @@ export default function FundTable({ data }: { data: string }) {
           <div className="space-y-1"><div className="text-muted-foreground">TEFAS hisse ağırlığı en az (%)</div>{num("stockMin", "Örn. 50")}</div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Yönetim ücreti, stopaj ve TEFAS açık/kapalı bilgisi TEFAS API'sinde yok.
+          Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Aktif: fonun TEFAS'ta son 7 gün içinde veri yayımlaması; pasif fonların (tasfiye/birleşme) son verisi eskidir, getiri ve nakit akışı gösterilmez. Yönetim ücreti, stopaj ve TEFAS işlem açık/kapalı bilgisi TEFAS API'sinde yok.
         </p>
       </details>
 
@@ -203,7 +204,7 @@ export default function FundTable({ data }: { data: string }) {
                     onChange={(e) => setPicked(e.target.checked ? [...picked, x.code] : picked.filter((c) => c !== x.code))} />
                 </TableCell>
                 <TableCell className="font-medium"><a className="hover:underline" href={`/fon/${x.code}`}>{x.code}</a></TableCell>
-                <TableCell className="max-w-xs truncate" title={`${x.name}\n${x.founder}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge></TableCell>
+                <TableCell className="max-w-xs truncate" title={`${x.name}\n${x.founder}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge>{!x.active && <Badge variant="outline" className="ml-1 text-red-600">Pasif</Badge>}</TableCell>
                 {stockCol.length > 0 && <TableCell className="text-right font-medium tabular-nums">{byStock?.[x.code]?.toFixed(2)}%</TableCell>}
                 {cols.map((c) => (
                   <TableCell key={c.key} className={`text-right tabular-nums ${c.color ? tone(x[c.key] as number) : ""}`}>{c.fmt(x[c.key])}</TableCell>
