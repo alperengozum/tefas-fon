@@ -2,7 +2,7 @@
 import Base from "../layouts/Base.astro";
 import CompareChart from "../components/CompareChart";
 import { getFunds } from "../lib/db";
-import { ret, RETURNS } from "../lib/analytics";
+import { forChart, ret, RETURNS } from "../lib/analytics";
 import { label, pct, tl, tone } from "../lib/format";
 
 const codes = [...new Set((Astro.url.searchParams.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 10);
@@ -22,7 +22,7 @@ const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
   </form>
   {funds.length === 0 ? <p class="text-muted-foreground">Fon listesinden kutucukları işaretleyin ya da kod girin.</p> : (
     <>
-      <section class="mb-8"><CompareChart client:only="react" series={funds.map((f) => ({ code: f.code, name: f.name, history: f.history }))} /></section>
+      <section class="mb-8"><CompareChart client:only="react" series={funds.map((f) => ({ code: f.code, name: f.name, history: forChart(f.history, ["price"]) }))} /></section>
       <div class="mb-8 overflow-x-auto rounded-lg border">
         <table class="w-full text-sm">
           <thead class="bg-muted/50 text-left"><tr><th class="p-2">Metrik</th>{funds.map((f) => <th class="p-2 text-right"><a class="hover:underline" href={`/fon/${f.code}`}>{f.code}</a></th>)}</tr></thead>

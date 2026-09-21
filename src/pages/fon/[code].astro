@@ -3,7 +3,7 @@ import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import { getFund, getFunds, getHoldings, peers } from "../../lib/db";
-import { ret, RETURNS } from "../../lib/analytics";
+import { forChart, ret, RETURNS } from "../../lib/analytics";
 import { label, pct, tl, tone } from "../../lib/format";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
@@ -49,7 +49,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
     ); })}
   </div>
 
-  <section class="mb-8"><FundCharts client:only="react" history={f.history} /></section>
+  <section class="mb-8"><FundCharts client:only="react" history={forChart(f.history, ["price", "size", "investors"])} /></section>
 
   {holdings.length > 0 && (
     <section class="mb-8">
@@ -70,7 +70,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
   {cmp.length > 1 && (
     <section class="mb-8">
       <h2 class="mb-3 font-semibold">İlk 4 rakiple karşılaştırma <span class="text-xs font-normal text-muted-foreground">seçili aralığın başı = 100</span></h2>
-      <CompareChart client:only="react" series={cmp.map((c) => ({ code: c.code, name: c.name, history: c.history }))} />
+      <CompareChart client:only="react" series={cmp.map((c) => ({ code: c.code, name: c.name, history: forChart(c.history, ["price"]) }))} />
     </section>
   )}
 
