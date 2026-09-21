@@ -169,3 +169,13 @@ test("/api/holdings: geçersiz ticker {} döner, JSON + cache header", async ({ 
   expect(r.headers()["cache-control"]).toContain("max-age");
   expect(await (await request.get("/api/holdings?ticker=%27%3B--")).json()).toEqual({});
 });
+
+test("sonsuz kaydırma: alta inince satırlar 100'den artar", async ({ page }) => {
+  await ready(page);
+  test.skip((await total(page)) <= 100, "100'den az fon var");
+  await expect(rows(page)).toHaveCount(100);
+  await page.getByText(/kaydırdıkça yüklenir/).scrollIntoViewIfNeeded();
+  await expect.poll(() => rows(page).count()).toBeGreaterThan(100);
+  await page.mouse.wheel(0, 100000);
+  await expect.poll(() => rows(page).count()).toBeGreaterThan(200);
+});
