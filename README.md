@@ -29,8 +29,9 @@ Hisse portföyü: `npm run holdings` — KAP'ın haftalık/aylık "Portföy Dağ
 - `/fon/KOD` ayrıca: endekslere karşı getiri tablosu + grafik (BIST 100, USD/TRY, gram altın), BIST100 betası/korelasyonu, kayan 3 aylık getiri dağılımı, hisse portföyü en çok örtüşen fonlar
 - `/karsilastir` ayrıca: fonlar arası getiri korelasyonu ve hisse örtüşmesi (Σ min ağırlık) matrisi, `endeks=1` ile endeks çizgileri
 - `/hisse/TICKER` — hisseyi tutan tüm fonlar, ağırlık ve tahmini TL pozisyon
-- `/portfoy?p=AFT:5000,TCD:3000` — birleşik varlık dağılımı, hisse maruziyeti, geriye dönük performans, korelasyon/örtüşme (tarayıcıda localStorage'a kaydedilir)
+- `/portfoy` — aranabilir fon seçicilerle fon ekle, tutar (₺) ya da adet (pay) gir; birleşik varlık dağılımı, hisse maruziyeti, geriye dönük performans, korelasyon/örtüşme. Adres `?f=AFT:tl:5000&f=TCD:adet:120` biçimindedir, paylaşılabilir; tarayıcıda localStorage'a kaydedilir
 - `/simulasyon?codes=AFT&monthly=5000&start=2025-09-21` — aylık düzenli alım (SIP, XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı
+- Karşılaştır/Simülasyon'da fonlar aranabilir çoklu seçiciyle eklenir (`?codes=A&codes=B`; eski `?codes=A,B` bağlantıları da çalışır)
 
 Endeks verisi Yahoo Finance'ten (`bench` tablosu, `node scripts/ingest.mjs bench`, günlük ingest sonunda otomatik). TEFAS'ta D tarihli fon fiyatı önceki işlem gününü yansıttığı için endeks tarihleri okunurken bir işlem günü kaydırılır (`getBench`). Saf hesaplar `src/lib/stats.ts`, testi `npm test`.
 

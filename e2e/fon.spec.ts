@@ -167,7 +167,8 @@ test("karşılaştırma: boş durum ve form ile kod girişi", async ({ page }) =
   const code = await codeAt(page);
   await page.goto("/karsilastir");
   await expect(page.getByText("Fon listesinden kutucukları işaretleyin")).toBeVisible();
-  await page.getByPlaceholder(/Fon kodları/).fill(code.toLowerCase());
+  await page.getByRole("combobox", { name: "Fon ekle" }).fill(code.toLowerCase()); // küçük harf de bulunmalı
+  await page.getByRole("option").first().click();
   await page.getByRole("button", { name: "Karşılaştır" }).click();
   await expect(page.locator("thead")).toContainText(code);
 });
@@ -227,14 +228,42 @@ test("simülasyon: fon ve endeksler için SIP/tek seferlik sonuç", async ({ pag
   await expect(page.locator("tbody tr", { hasText: "BIST 100" })).toContainText("%");
 });
 
-test("portföy: birleşik analiz, tarayıcıda hatırlanır", async ({ page, request }) => {
+// fon seçici: koda küçük harfle yaz, listeden ilk eşleşmeyi seç (combobox adı `name`)
+const pick = async (page, name, code, nth = 0) => {
+  await page.getByRole("combobox", { name }).nth(nth).fill(code.toLowerCase());
+  await page.getByRole("option").first().click();
+};
+
+test("portföy: seçicilerle tutar ve adet gir, birleşik analiz, tarayıcıda hatırlanır", async ({ page, request }) => {
   const codes = await holders(request);
   test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
-  await page.goto(`/portfoy?p=${codes[0]}:1000,${codes[1]}:2000`);
+  await page.goto("/portfoy");
+  await pick(page, "Fon 1", codes[0]);
+  await page.getByLabel("Tutar (₺)").fill("1000");
+  await page.getByRole("button", { name: "Fon ekle" }).click();
+  await pick(page, "Fon 2", codes[1]);
+  await page.locator("select").nth(1).selectOption("adet");
+  await page.getByLabel("Adet", { exact: true }).fill("50");
+  await page.getByRole("button", { name: "Analiz et" }).click();
+  await expect(page).toHaveURL(new RegExp(`f=${codes[0]}%3Atl%3A1000.*f=${codes[1]}%3Aadet%3A50`));
   await expect(page.getByRole("heading", { name: "Birleşik varlık dağılımı" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Getiri korelasyonu/ })).toBeVisible();
-  await page.goto("/portfoy"); // p yok -> localStorage'dan geri yüklenir
-  await expect(page).toHaveURL(new RegExp(`p=${codes[0]}`));
+  await expect(page.locator("th", { hasText: "Adet" })).toBeVisible();
+  await page.goto("/portfoy"); // parametre yok -> localStorage'dan geri yüklenir
+  await expect(page).toHaveURL(new RegExp(`f=${codes[0]}`));
+  await expect(page.getByTestId("portfoy-satir")).toHaveCount(2);
+});
+
+test("simülasyon: çoklu fon seçici çip ekler/çıkarır, form ?codes= gönderir", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto("/simulasyon");
+  await pick(page, "Fon ekle", codes[0]);
+  await pick(page, "Fon ekle", codes[1]);
+  await page.getByRole("button", { name: `${codes[1]} fonunu çıkar` }).click();
+  await page.getByRole("button", { name: "Hesapla" }).click();
+  await expect(page).toHaveURL(new RegExp(`codes=${codes[0]}(&|$)`));
+  await expect(page.locator("tbody tr").first()).toContainText(codes[0]);
 });
 
 test("favoriler: listede yıldızla ekle, /favoriler'de görün, detayda çıkar", async ({ page }) => {

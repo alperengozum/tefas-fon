@@ -2,22 +2,32 @@
 import Base from "../layouts/Base.astro";
 import CompareChart from "../components/CompareChart";
 import Matrix from "../components/Matrix.astro";
+import PortfolioForm from "../components/PortfolioForm";
 import { getBench, getFunds } from "../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../lib/analytics";
 import { corr, dailyReturns, overlap } from "../lib/stats";
 import { label, pct, tl, tone } from "../lib/format";
 
-// ?p=AFT:5000,TCD:3000 (fon:tutar). Tarayıcıda localStorage'a kaydedilir, URL paylaşılabilir.
-const raw = Astro.url.searchParams.get("p") ?? "";
-const amounts = new Map<string, number>();
-for (const part of raw.split(",")) {
-  const [c, a] = part.trim().toUpperCase().split(":");
-  const v = Number((a ?? "").replace(/\./g, "").replace(",", "."));
-  if (c && v > 0) amounts.set(c, (amounts.get(c) ?? 0) + v);
-}
-const codes = [...amounts.keys()].slice(0, 15);
+// ?f=AFT:tl:5000&f=TCD:adet:120 (fon:tl|adet:değer, tekrarlı parametre). Form tarayıcıda localStorage'a kaydeder, URL paylaşılabilir.
+const entered = Astro.url.searchParams.getAll("f").flatMap((s) => {
+  const [c, m, v] = s.split(":");
+  const n = Number(v);
+  return c && (m === "tl" || m === "adet") && n > 0 ? [{ code: c.toUpperCase(), mode: m as "tl" | "adet", value: n }] : [];
+}).slice(0, 15);
+const codes = [...new Set(entered.map((e) => e.code))];
 const [{ funds, holdings }, bench] = await Promise.all([getFunds(codes), codes.length ? getBench() : Promise.resolve({} as Awaited<ReturnType<typeof getBench>>)]);
 const missing = codes.filter((c) => !funds.some((f) => f.code === c));
+// tutar (TL): adet girildiyse güncel fiyatla çarpılır; aynı fon birden çok satırdaysa toplanır
+const price = new Map(funds.map((f) => [f.code, f.history.at(-1)!.price]));
+const amounts = new Map<string, number>();
+const units = new Map<string, number>();
+for (const e of entered) {
+  const p = price.get(e.code);
+  if (!p) continue;
+  const u = e.mode === "adet" ? e.value : e.value / p;
+  units.set(e.code, (units.get(e.code) ?? 0) + u);
+  amounts.set(e.code, (amounts.get(e.code) ?? 0) + u * p);
+}
 const total = funds.reduce((s, f) => s + amounts.get(f.code)!, 0);
 const w = (code: string) => amounts.get(code)! / total;
 
@@ -36,7 +46,6 @@ const stockPct = allocRows.find(([k]) => k === "hs")?.[1] ?? 0;
 const covered = stocks.reduce((s, [, e]) => s + e.pct, 0);
 
 // Geriye dönük değer serisi: bugünkü lot sayılarını (tutar / son fiyat) tüm fonların ortak günlerinde fiyatla çarp
-const units = new Map(funds.map((f) => [f.code, amounts.get(f.code)! / f.history.at(-1)!.price]));
 const maps = funds.map((f) => new Map(f.history.map((r) => [r.date, r.price])));
 const series = funds.length
   ? [...maps[0].keys()].filter((d) => maps.every((m) => m.has(d))).sort().map((date) => ({ date, price: funds.reduce((s, f, i) => s + units.get(f.code)! * maps[i].get(date)!, 0) }))
@@ -47,15 +56,12 @@ const ids = funds.map((f) => f.code);
 const cors = rets.map((a) => rets.map((b) => corr(a, b)));
 const ovl = funds.map((a) => funds.map((b) => { const x = holdings.get(a.code), y = holdings.get(b.code); return x?.length && y?.length ? overlap(x, y) : null; }));
 const hasOvl = ovl.some((r, i) => r.some((v, j) => i !== j && v != null));
-const plain = funds.map((f) => `${f.code}:${amounts.get(f.code)}`).join(", ");
+const initial = entered.map((e) => ({ code: e.code, mode: e.mode, value: String(e.value) }));
 ---
 <Base title="Portföyüm · TEFAS Fon Analiz">
   <h1 class="mb-1 text-xl font-semibold">Portföyüm</h1>
-  <p class="mb-4 text-sm text-muted-foreground">Fonlarını ve tutarlarını gir (<code>AFT:5000, TCD:3000</code>); birleşik varlık dağılımı, hisse maruziyeti ve fonlar arası örtüşme çıkar. Kayıt yalnız bu tarayıcıda tutulur; adres paylaşılabilir.</p>
-  <form id="pf" class="mb-6 flex flex-wrap gap-2" method="get">
-    <input name="p" value={plain || raw} placeholder="AFT:5000, TCD:3000, MAC:2000" class="h-8 w-full rounded-lg border bg-transparent px-2 text-sm sm:w-96" />
-    <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Analiz et</button>
-  </form>
+  <p class="mb-4 text-sm text-muted-foreground">Fonlarını seç, tutar (₺) ya da adet (pay) gir; birleşik varlık dağılımı, hisse maruziyeti ve fonlar arası örtüşme çıkar. Kayıt yalnız bu tarayıcıda tutulur; adres paylaşılabilir.</p>
+  <PortfolioForm client:only="react" initial={initial} />
   {missing.length > 0 && <p class="mb-3 text-sm text-red-600">Bulunamadı: {missing.join(", ")}</p>}
   {funds.length === 0 ? <p class="text-muted-foreground">Analiz için en az bir fon ve tutar girin.</p> : (
     <>
@@ -69,9 +75,9 @@ const plain = funds.map((f) => `${f.code}:${amounts.get(f.code)}`).join(", ");
         <h2 class="mb-3 font-semibold">Fonlar</h2>
         <div class="overflow-x-auto rounded-lg border">
           <table class="w-full text-sm tabular-nums">
-            <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Tutar</th><th class="p-2">Pay</th></tr></thead>
+            <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Adet</th><th class="p-2">Fiyat</th><th class="p-2">Tutar</th><th class="p-2">Pay</th></tr></thead>
             <tbody>{funds.map((f) => (
-              <tr class="border-t"><td class="p-2 text-left"><a class="hover:underline" href={`/fon/${f.code}`}><b>{f.code}</b> <span class="text-muted-foreground">{f.name}</span></a></td><td class="p-2 text-right">{tl(amounts.get(f.code))}</td><td class="p-2 text-right">{(w(f.code) * 100).toFixed(1)}%</td></tr>
+              <tr class="border-t"><td class="p-2 text-left"><a class="hover:underline" href={`/fon/${f.code}`}><b>{f.code}</b> <span class="text-muted-foreground">{f.name}</span></a></td><td class="p-2 text-right">{units.get(f.code)!.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</td><td class="p-2 text-right">{price.get(f.code)!.toFixed(4)}</td><td class="p-2 text-right">{tl(amounts.get(f.code))}</td><td class="p-2 text-right">{(w(f.code) * 100).toFixed(1)}%</td></tr>
             ))}</tbody>
           </table>
         </div>
@@ -120,11 +126,4 @@ const plain = funds.map((f) => `${f.code}:${amounts.get(f.code)}`).join(", ");
       )}
     </>
   )}
-  <script is:inline>
-    try {
-      const sp = new URLSearchParams(location.search);
-      if (sp.has("p")) { const v = sp.get("p"); v ? localStorage.setItem("portfoy", v) : localStorage.removeItem("portfoy"); }
-      else { const s = localStorage.getItem("portfoy"); if (s) location.replace("?p=" + encodeURIComponent(s)); }
-    } catch {}
-  </script>
 </Base>
