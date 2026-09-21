@@ -67,7 +67,8 @@ async function yahoo(sym) {
   const r = (await res.json()).chart?.result?.[0];
   if (!r) throw new Error("Yahoo boş yanıt: " + sym);
   const c = r.indicators.quote[0].close;
-  return r.timestamp.map((t, i) => [ymd(new Date((t + r.meta.gmtoffset) * 1000)), c[i]]).filter(([, v]) => v > 0);
+  // Yahoo aynı güne iki bar verebiliyor (ör. gün içi + kapanış): tarihe göre tekilleştir, sonuncusu kalır (INSERT tek satıra iki kez yazamaz)
+  return [...new Map(r.timestamp.map((t, i) => [ymd(new Date((t + r.meta.gmtoffset) * 1000)), c[i]]).filter(([, v]) => v > 0))];
 }
 async function fetchBench() {
   try {
