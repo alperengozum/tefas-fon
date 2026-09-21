@@ -13,7 +13,7 @@ if (!k) return new Response(null, { status: 404 });
 const { ref, funds } = await listFunds(k[0]);
 ---
 <Base title={`${k[1]} · TEFAS Fon Analiz`}>
-  <div class="mb-4 flex items-baseline justify-between">
+  <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-4">
     <h1 class="text-xl font-semibold">{k[1]}</h1>
     <span class="text-sm text-muted-foreground">Veri tarihi: {ref || "–"} · {funds.length} fon</span>
   </div>

@@ -23,7 +23,7 @@ export default function CompareChart({ series }: { series: Series[] }) {
       <div className="flex gap-2">
         {RANGES.map(([l, d]) => <Button key={l} size="sm" variant={range === d ? "default" : "outline"} onClick={() => setRange(d)}>{l}</Button>)}
       </div>
-      <div className="h-96">
+      <div className="h-72 sm:h-96">
         <ResponsiveContainer>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
