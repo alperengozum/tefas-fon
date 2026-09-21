@@ -22,3 +22,7 @@ Günlük güncelleme için `npm run ingest`'i cron'a koyun.
 ## Sınırlar (TEFAS API'sinde olmayan veriler)
 Yönetim ücreti, stopaj, risk değeri, kurucu, hisse bazlı portföy (EREGL %5 gibi), KAP akışı, BIST/dolar/altın benchmark yok.
 Nakit akışı = pay sayısı değişimi × güncel fiyat (yaklaşık). Kategori = en büyük varlık kalemi. Varlık dağılımı sadece son gün.
+
+## Deploy (Coolify)
+`Dockerfile` + `start.sh`: konteyner şemayı hazırlar, ingest'i günlük döngüde arka planda çalıştırır (ilk açılışta ~20 dk backfill), web'i 4321'de sunar.
+Gerekli env: `DATABASE_URL` (Coolify Postgres iç adresi). Domain: `fon.yourapiservice.com` (Cloudflare A kaydı → sunucu IP'si, proxied).
