@@ -1,4 +1,5 @@
 import type { Fund } from "./db";
+import { fold } from "./classify";
 
 // Liste sayfası 2000+ fonu HTML'e gömüyordu (nesne başına ~1.3KB, Astro her değeri [0,v] ile sarıyor -> 2.6MB).
 // Burada satırlar dizi, tekrar eden metinler (tür/kurucu/kategori) sözlük, bayraklar bit maskesi, sayılar yuvarlanmış: ~%85 küçük.
@@ -36,7 +37,7 @@ export function decodeFunds(json: string): FundRow[] {
     FLAGS.forEach((k, i) => (f[k] = !!(r[5] & (1 << i))));
     RET.forEach((k, i) => (f[k] = r[11 + i]));
     FLOW.forEach((k, i) => (f[k] = r[11 + RET.length + i]));
-    f.hay = `${f.code} ${f.name}`.toLocaleLowerCase("tr");
+    f.hay = fold(`${f.code} ${f.name}`);
     return f as FundRow;
   });
 }

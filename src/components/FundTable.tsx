@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
+import { fold } from "../lib/classify";
 import { label, pct, tl, tone } from "../lib/format";
 import { useFavorites } from "../lib/favorites";
 import { FavStar } from "./FavStar";
@@ -91,7 +92,7 @@ function FundTableView({ data, favOnly }: { data: string; favOnly: boolean }) {
   // yazarken girdi hemen güncellenir, 2000 satırlık filtre/sıralama ertelenmiş değerle yapılır
   const df = useDeferredValue(f);
   const rows = useMemo(() => {
-    const s = df.q.trim().toLocaleLowerCase("tr");
+    const s = fold(df.q.trim());
     const n = (v: string) => (v === "" ? null : Number(v));
     const [riskMin, riskMax, invMin, invMax, sizeMin, sizeMax, stockMin] = [df.riskMin, df.riskMax, df.invMin, df.invMax, df.sizeMin, df.sizeMax, df.stockMin].map(n);
     return funds
