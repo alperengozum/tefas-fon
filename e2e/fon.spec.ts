@@ -139,6 +139,16 @@ test("fon detay: metrikler, grafik, varlık dağılımı, rakipler", async ({ pa
   await expect(page.getByRole("link", { name: "Karşılaştırmaya ekle" })).toHaveAttribute("href", `/karsilastir?codes=${code}`);
 });
 
+test("fon detay: rakip karşılaştırma grafiği, legend'da geniş isim (title)", async ({ page }) => {
+  await ready(page);
+  await page.goto(`/fon/${await codeAt(page)}`);
+  await expect(page.getByRole("heading", { name: /İlk 4 rakiple karşılaştırma/ })).toBeVisible();
+  const legend = page.locator(".recharts-legend-item-text span[title]");
+  await expect(legend.first()).toBeVisible();
+  expect(((await legend.first().getAttribute("title")) ?? "").length).toBeGreaterThan(3);
+  expect(await legend.count()).toBeGreaterThanOrEqual(2);
+});
+
 test("listede fon seç -> Karşılaştır -> karşılaştırma sayfası", async ({ page }) => {
   await ready(page);
   const [a, b] = [await codeAt(page, 0), await codeAt(page, 1)];

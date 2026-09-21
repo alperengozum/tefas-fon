@@ -1,7 +1,8 @@
 ---
 import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
-import { getFund, getHoldings, peers } from "../../lib/db";
+import CompareChart from "../../components/CompareChart";
+import { getFund, getFunds, getHoldings, peers } from "../../lib/db";
 import { ret, RETURNS } from "../../lib/analytics";
 import { label, pct, tl, tone } from "../../lib/format";
 
@@ -19,6 +20,8 @@ const why = holdings.length || stockPct <= 0 ? null
   : f.name.startsWith("İŞ PORTFÖY") ? "İş Portföy raporları görüntü olarak yayımlanıyor (metin yok), okunamıyor."
   : seen ? "KAP portföy raporu bulundu ama tablo düzeni okunamadı."
   : "KAP'ta bu fon için portföy dağılım raporu bulunamadı.";
+const top = rivals.slice(0, 4).map((r) => r.code);
+const cmp = top.length ? (await getFunds([f.code, ...top])).funds : [];
 const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 ---
 <Base title={`${f.code} · TEFAS Fon Analiz`}>
@@ -63,6 +66,13 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
   )}
 
   {why && <p class="mb-8 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"><b>Hisse portföyü yok:</b> {why}</p>}
+
+  {cmp.length > 1 && (
+    <section class="mb-8">
+      <h2 class="mb-3 font-semibold">İlk 4 rakiple karşılaştırma <span class="text-xs font-normal text-muted-foreground">seçili aralığın başı = 100</span></h2>
+      <CompareChart client:only="react" series={cmp.map((c) => ({ code: c.code, name: c.name, history: c.history }))} />
+    </section>
+  )}
 
   <div class="grid gap-8 md:grid-cols-2">
     <section>
