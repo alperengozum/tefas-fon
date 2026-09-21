@@ -102,7 +102,7 @@ test("risk aralığı: min 2 > maks 1 boş liste verir", async ({ page }) => {
 test("fon türü seçici listeyi daraltır", async ({ page }) => {
   await ready(page);
   const all = await total(page);
-  await page.locator("[data-slot=select-trigger]").first().click();
+  await page.locator("[data-slot=select-trigger]", { hasText: "Tüm fon türleri" }).click();
   const opt = page.getByRole("option").nth(1);
   const name = (await opt.innerText()).trim();
   await opt.click();
