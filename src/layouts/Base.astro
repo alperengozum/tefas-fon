@@ -20,6 +20,7 @@ const path = Astro.url.pathname;
           <a href={`/fonlar/${k}`} class={path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
         ))}
         <a href="/karsilastir" class={path === "/karsilastir" ? "font-medium" : "text-muted-foreground hover:text-foreground"}>Karşılaştır</a>
+        <a href="/favoriler" class={path === "/favoriler" ? "font-medium" : "text-muted-foreground hover:text-foreground"}>★ Favorilerim</a>
       </nav>
     </header>
     <main class="mx-auto max-w-[1700px] px-3 py-4 sm:px-4 sm:py-6"><slot /></main>

@@ -189,3 +189,16 @@ test("sonsuz kaydırma: alta inince satırlar 100'den artar", async ({ page }) =
   await page.mouse.wheel(0, 100000);
   await expect.poll(() => rows(page).count()).toBeGreaterThan(200);
 });
+
+test("favoriler: listede yıldızla ekle, /favoriler'de görün, detayda çıkar", async ({ page }) => {
+  await ready(page);
+  const code = await codeAt(page);
+  await rows(page).first().getByRole("button", { name: "Favorilere ekle" }).click();
+  await page.goto("/favoriler");
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first().locator("td").nth(1)).toHaveText(code);
+  await page.goto(`/fon/${code}`);
+  await page.getByRole("button", { name: "Favorilerden çıkar" }).click();
+  await page.goto("/favoriler");
+  await expect(page.getByText("Henüz favori fon yok")).toBeVisible();
+});
