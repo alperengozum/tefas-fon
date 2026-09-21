@@ -258,6 +258,10 @@ test("simülasyon: çoklu fon seçici çip ekler/çıkarır, form ?codes= gönde
   const codes = await holders(request);
   test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
   await page.goto("/simulasyon");
+  await expect(page.locator("table")).toHaveCount(0); // sonuç (endeks satırları dahil) Hesapla'dan önce görünmez
+  await page.getByRole("button", { name: "Hesapla" }).click(); // fon seçmeden Hesapla: tablo yok, uyarı var
+  await expect(page.getByText("Hesaplamak için en az bir fon seç")).toBeVisible();
+  await expect(page.locator("table")).toHaveCount(0);
   await pick(page, "Fon ekle", codes[0]);
   await pick(page, "Fon ekle", codes[1]);
   await page.getByRole("button", { name: `${codes[1]} fonunu çıkar` }).click();
