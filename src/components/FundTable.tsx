@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Fund } from "../lib/db";
 import { label, pct, tl, tone } from "../lib/format";
 import { Input } from "./ui/input";
@@ -24,7 +24,7 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
   { key: "qualified", name: "Nitelikli / Özel" }, { key: "oks", name: "OKS" },
 ];
 
-const EMPTY = { q: "", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "" };
+const EMPTY = { q: "", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "" };
 const sel = "h-8 rounded-lg border bg-transparent px-2 text-sm";
 
 export default function FundTable({ funds }: { funds: Fund[] }) {
@@ -34,6 +34,18 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
   const [sort, setSort] = useState<{ key: keyof Fund; dir: 1 | -1 }>({ key: "size", dir: -1 });
   const [limit, setLimit] = useState(100);
   const [picked, setPicked] = useState<string[]>([]);
+  // Hisse filtresi (KAP portföy raporu): ?hisse=EREGL ile de açılır
+  const [byStock, setByStock] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(location.search).get("hisse");
+    if (q) set({ stock: q.toUpperCase(), stockW: "1" });
+  }, []);
+  useEffect(() => {
+    const t = f.stock.trim().toUpperCase();
+    if (t.length < 2) return setByStock(null);
+    const id = setTimeout(() => fetch(`/api/holdings?ticker=${t}&min=${Number(f.stockW) || 0}`).then((r) => r.json()).then(setByStock).catch(() => setByStock({})), 250);
+    return () => clearTimeout(id);
+  }, [f.stock, f.stockW]);
 
   const opts = useMemo(() => {
     const uniq = (k: keyof Fund) => [...new Set(funds.map((x) => x[k] as string).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
@@ -56,12 +68,13 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
         (riskMin == null || (x.risk != null && x.risk >= riskMin)) && (riskMax == null || (x.risk != null && x.risk <= riskMax)) &&
         (invMin == null || (x.investors ?? 0) >= invMin) && (invMax == null || (x.investors ?? 0) <= invMax) &&
         (sizeMin == null || x.size >= sizeMin * 1e6) && (sizeMax == null || x.size <= sizeMax * 1e6) &&
-        (stockMin == null || x.stock >= stockMin))
+        (stockMin == null || x.stock >= stockMin) &&
+        (f.stock.trim().length < 2 || (byStock != null && x.code in byStock)))
       .sort((a, b) => {
         const x = a[sort.key] as any, y = b[sort.key] as any;
         return (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
       });
-  }, [funds, f, sort]);
+  }, [funds, f, sort, byStock]);
 
   // Kategori bazında net nakit girişi (1 ay), filtrelenmiş fonlar üzerinden
   const byCat = useMemo(() => {
@@ -71,6 +84,7 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
   }, [rows]);
 
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
+  const stockCol: Col[] = byStock && f.stock.trim().length >= 2 ? [{ key: "code", head: `${f.stock.toUpperCase()} %`, fmt: () => "" }] : [];
   const cols = VIEWS[view].cols;
   const th = (key: keyof Fund, head: string, right = true) => (
     <TableHead key={key} className={`cursor-pointer select-none whitespace-nowrap ${right ? "text-right" : ""}`}
@@ -101,6 +115,10 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
           <option value="">Tüm kurucular (PYŞ)</option>
           {opts.founders.map((t) => <option key={t}>{t}</option>)}
         </select>
+        <div className="flex items-center gap-1">
+          <Input className="w-28 uppercase" placeholder="Hisse (EREGL)" value={f.stock} onChange={(e) => set({ stock: e.target.value })} />
+          <Input className="w-24" type="number" placeholder="≥ % ağırlık" value={f.stockW} onChange={(e) => set({ stockW: e.target.value })} />
+        </div>
         {opts.flags.map((fl) => (
           <Button key={fl.key} size="sm" variant={f.flags.includes(fl.key) ? "default" : "outline"}
             onClick={() => set({ flags: f.flags.includes(fl.key) ? f.flags.filter((k) => k !== fl.key) : [...f.flags, fl.key] })}>
@@ -129,7 +147,7 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
             <div className="flex items-center gap-2">{num("invMin", "Min")}–{num("invMax", "Maks")}</div></div>
           <div className="space-y-1"><div className="text-muted-foreground">Fon büyüklüğü (mn ₺)</div>
             <div className="flex items-center gap-2">{num("sizeMin", "Min")}–{num("sizeMax", "Maks")}</div></div>
-          <div className="space-y-1"><div className="text-muted-foreground">Hisse ağırlığı en az (%)</div>{num("stockMin", "Örn. 50")}</div>
+          <div className="space-y-1"><div className="text-muted-foreground">TEFAS hisse ağırlığı en az (%)</div>{num("stockMin", "Örn. 50")}</div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Yönetim ücreti, stopaj ve TEFAS açık/kapalı bilgisi TEFAS API'sinde yok.
@@ -154,6 +172,7 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
               <TableHead className="w-8" />
               {th("code", "Kod", false)}
               {th("name", "Fon", false)}
+              {stockCol.length > 0 && <TableHead className="text-right whitespace-nowrap">{stockCol[0].head}</TableHead>}
               {cols.map((c) => th(c.key, c.head))}
             </TableRow>
           </TableHeader>
@@ -166,6 +185,7 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
                 </TableCell>
                 <TableCell className="font-medium"><a className="hover:underline" href={`/fon/${x.code}`}>{x.code}</a></TableCell>
                 <TableCell className="max-w-xs truncate" title={`${x.name}\n${x.founder}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge></TableCell>
+                {stockCol.length > 0 && <TableCell className="text-right font-medium tabular-nums">{byStock?.[x.code]?.toFixed(2)}%</TableCell>}
                 {cols.map((c) => (
                   <TableCell key={c.key} className={`text-right tabular-nums ${c.color ? tone(x[c.key] as number) : ""}`}>{c.fmt(x[c.key])}</TableCell>
                 ))}

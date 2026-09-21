@@ -6,7 +6,8 @@
     "build": "astro build",
     "start": "node dist/server/entry.mjs",
     "ingest": "node scripts/ingest.mjs",
-    "db:init": "psql \"${DATABASE_URL:-postgres://tefas:tefas@localhost/tefas}\" -f db/schema.sql"
+    "db:init": "psql \"${DATABASE_URL:-postgres://tefas:tefas@localhost/tefas}\" -f db/schema.sql",
+    "holdings": "node scripts/holdings.mjs"
   },
   "keywords": [],
   "author": "",
@@ -22,6 +23,7 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.3.2",
     "lucide-react": "^1.47.0",
+    "pdfjs-dist": "^6.3.289",
     "pg": "^8.23.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

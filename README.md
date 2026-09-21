@@ -14,13 +14,16 @@ npm run dev          # http://localhost:4321
 2Y/3Y/5Y getiri için tüm geçmiş çekilmez; ingest sadece o vadelerin hedef tarihi çevresindeki 1 haftalık pencereyi çeker (TEFAS: en fazla 5 yıl geriye gider). Kayan tarihler her çalıştırmada tamamlanır.
 Günlük güncelleme için `npm run ingest`'i cron'a koyun.
 
+Hisse portföyü: `npm run holdings` — KAP'ın haftalık/aylık "Portföy Dağılım Raporu" PDF'lerinden hisse ağırlıklarını çıkarır (KAP 429 verdiği için yavaş: ilk çalıştırma ~30 dk).
+
 ## Sayfalar
 - `/fonlar/{yat,bes,byf,gyf}` — liste; Getiri / Büyüklük / Nakit Giriş-Çıkışı sekmeleri, arama, kategori, min büyüklük/yatırımcı/hisse % filtresi
 - `/fon/KOD` — detay: getiri, nakit akışı, fiyat/büyüklük/yatırımcı grafiği, varlık dağılımı, rakip fonlar
 - `/karsilastir?codes=A,B,...` — en fazla 10 fon: 100'e endeksli grafik, metrikler, varlık dağılımı
 
 ## Sınırlar (TEFAS API'sinde olmayan veriler)
-Yönetim ücreti, stopaj, risk değeri, kurucu, hisse bazlı portföy (EREGL %5 gibi), KAP akışı, BIST/dolar/altın benchmark yok.
+Yönetim ücreti, stopaj, KAP akışı, BIST/dolar/altın benchmark yok.
+Hisse portföyü sadece KAP PDR'si okunabilen fonlarda var: BES fonları KAP'ta bu formatta yok, İş Portföy PDF'leri taranmış görüntü (OCR yok), bazı şirketlerin tablo düzeni tanınmıyor; ağırlıklar TEFAS hisse %'siyle tutarlı değilse fon atlanır.
 Nakit akışı = pay sayısı değişimi × güncel fiyat (yaklaşık). Kategori = en büyük varlık kalemi. Varlık dağılımı sadece son gün.
 
 ## Deploy (Coolify)

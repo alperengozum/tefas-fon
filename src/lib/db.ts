@@ -89,3 +89,19 @@ export async function peers(code: string, kind: string, n = 8) {
     .map((r) => ({ code: r.code as string, name: r.name as string, d: dist(me.data, r.data) }))
     .sort((a, b) => a.d - b.d).slice(0, n);
 }
+
+export type Holding = { ticker: string; weight: number };
+
+export async function getHoldings(code: string): Promise<{ holdings: Holding[]; report: string | null; published: string | null }> {
+  const [h, m] = await Promise.all([
+    pool.query(`SELECT ticker, weight FROM holdings WHERE code=$1 ORDER BY weight DESC`, [code]),
+    pool.query(`SELECT report, published::text FROM holdings_meta WHERE code=$1`, [code]),
+  ]);
+  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null };
+}
+
+// Hisse filtresi: `ticker`ı en az `min` % ağırlıkla tutan fonlar -> {kod: ağırlık}
+export async function fundsHolding(ticker: string, min: number): Promise<Record<string, number>> {
+  const { rows } = await pool.query(`SELECT code, weight FROM holdings WHERE ticker=$1 AND weight >= $2`, [ticker, min]);
+  return Object.fromEntries(rows.map((r) => [r.code, r.weight]));
+}

@@ -1,7 +1,7 @@
 ---
 import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
-import { getFund, peers } from "../../lib/db";
+import { getFund, getHoldings, peers } from "../../lib/db";
 import { ret, RETURNS } from "../../lib/analytics";
 import { label, pct, tl, tone } from "../../lib/format";
 
@@ -11,6 +11,7 @@ const last = f.history[f.history.length - 1];
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
 const rivals = await peers(f.code, f.kind);
+const { holdings, report, published } = await getHoldings(f.code);
 const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 ---
 <Base title={`${f.code} · TEFAS Fon Analiz`}>
@@ -39,6 +40,20 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
   </div>
 
   <section class="mb-8"><FundCharts client:only="react" history={f.history} /></section>
+
+  {holdings.length > 0 && (
+    <section class="mb-8">
+      <h2 class="mb-3 font-semibold">Hisse portföyü <span class="text-xs font-normal text-muted-foreground">KAP Portföy Dağılım Raporu · {report} · yayın {published} · portföy değerine oran</span></h2>
+      <div class="grid gap-x-8 gap-y-1.5 text-sm md:grid-cols-2">
+        {holdings.map((h) => (
+          <div>
+            <div class="flex justify-between"><a class="font-medium hover:underline" href={`/fonlar/yat?hisse=${h.ticker}`}>{h.ticker}</a><span class="tabular-nums">{h.weight.toFixed(2)}%</span></div>
+            <div class="h-1.5 rounded bg-muted"><div class="h-1.5 rounded bg-primary" style={`width:${Math.min(h.weight, 100)}%`} /></div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )}
 
   <div class="grid gap-8 md:grid-cols-2">
     <section>
