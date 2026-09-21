@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
 type Col = { key: keyof Fund; head: string; fmt: (v: any) => string; color?: boolean };
@@ -25,7 +26,20 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
 ];
 
 const EMPTY = { q: "", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "" };
-const sel = "h-8 rounded-lg border bg-transparent px-2 text-sm";
+const ALL = "__all"; // base-ui boş string değerini "seçim yok" sayar; "hepsi" için sabit değer kullan
+
+// Sayfa içinde çizilen (shadcn/base-ui) seçim kutusu; doğal <select> açılır listesi yerine.
+function Pick({ value, onChange, all, items, className }: { value: string; onChange: (v: string) => void; all: string; items: { value: string; label: string }[]; className?: string }) {
+  const list = [{ value: ALL, label: all }, ...items];
+  return (
+    <Select items={list} value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : String(v))}>
+      <SelectTrigger className={className}><SelectValue /></SelectTrigger>
+      <SelectContent className="max-h-72" alignItemWithTrigger={false}>
+        {list.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function FundTable({ funds }: { funds: Fund[] }) {
   const [view, setView] = useState("getiri");
@@ -95,28 +109,18 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
   const num = (k: keyof typeof EMPTY, ph: string, w = "w-28") => (
     <Input className={w} type="number" placeholder={ph} value={f[k] as string} onChange={(e) => set({ [k]: e.target.value })} />
   );
-  const riskSel = (k: "riskMin" | "riskMax", ph: string) => (
-    <select className={sel} value={f[k]} onChange={(e) => set({ [k]: e.target.value })}>
-      <option value="">{ph}</option>
-      {[1, 2, 3, 4, 5, 6, 7].map((r) => <option key={r} value={r}>{r}</option>)}
-    </select>
-  );
+  const riskItems = [1, 2, 3, 4, 5, 6, 7].map((r) => ({ value: String(r), label: String(r) }));
+  const riskSel = (k: "riskMin" | "riskMax", ph: string) => <Pick className="w-20" value={f[k]} onChange={(v) => set({ [k]: v })} all={ph} items={riskItems} />;
 
   return (
     <div className="space-y-4">
       {/* hızlı filtreler */}
       <div className="flex flex-wrap items-center gap-2">
         <Input className="w-56" placeholder="Fon kodu veya adı…" value={f.q} onChange={(e) => set({ q: e.target.value })} />
-        <select className={sel} value={f.type} onChange={(e) => set({ type: e.target.value })}>
-          <option value="">Tüm fon türleri</option>
-          {opts.types.map((t) => <option key={t}>{t}</option>)}
-        </select>
-        <select className={`${sel} max-w-56`} value={f.founder} onChange={(e) => set({ founder: e.target.value })}>
-          <option value="">Tüm kurucular (PYŞ)</option>
-          {opts.founders.map((t) => <option key={t}>{t}</option>)}
-        </select>
+        <Pick className="w-44" value={f.type} onChange={(v) => set({ type: v })} all="Tüm fon türleri" items={opts.types.map((t) => ({ value: t, label: t }))} />
+        <Pick className="w-56" value={f.founder} onChange={(v) => set({ founder: v })} all="Tüm kurucular (PYŞ)" items={opts.founders.map((t) => ({ value: t, label: t }))} />
         <div className="flex items-center gap-1">
-          <Input className="w-28 uppercase" placeholder="Hisse (EREGL)" value={f.stock} onChange={(e) => set({ stock: e.target.value })} />
+          <Input className="w-36 uppercase" placeholder="Hisse (EREGL)" value={f.stock} onChange={(e) => set({ stock: e.target.value })} />
           <Input className="w-24" type="number" placeholder="≥ % ağırlık" value={f.stockW} onChange={(e) => set({ stockW: e.target.value })} />
         </div>
         {opts.flags.map((fl) => (
@@ -135,12 +139,9 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
       <details className="rounded-lg border p-3">
         <summary className="cursor-pointer text-sm font-medium">Tüm Filtreler</summary>
         <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-1"><div className="text-muted-foreground">Baskın varlık</div>
-            <select className={`${sel} w-full`} value={f.cat} onChange={(e) => set({ cat: e.target.value })}>
-              <option value="">Tümü</option>
-              {opts.cats.map((c) => <option key={c} value={c}>{label(c)}</option>)}
-            </select>
-          </label>
+          <div className="space-y-1"><div className="text-muted-foreground">Baskın varlık</div>
+            <Pick className="w-full" value={f.cat} onChange={(v) => set({ cat: v })} all="Tümü" items={opts.cats.map((c) => ({ value: c, label: label(c) }))} />
+          </div>
           <div className="space-y-1"><div className="text-muted-foreground">Risk değeri (1–7, tahmini)</div>
             <div className="flex items-center gap-2">{riskSel("riskMin", "Min")}–{riskSel("riskMax", "Maks")}</div></div>
           <div className="space-y-1"><div className="text-muted-foreground">Yatırımcı sayısı</div>
