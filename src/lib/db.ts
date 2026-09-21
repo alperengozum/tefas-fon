@@ -114,3 +114,22 @@ export async function fundsHolding(ticker: string, min: number): Promise<Record<
   const { rows } = await pool.query(`SELECT code, weight FROM holdings WHERE ticker=$1 AND weight >= $2`, [ticker, min]);
   return Object.fromEntries(rows.map((r) => [r.code, r.weight]));
 }
+
+// Karşılaştırma için toplu okuma: fon başına ayrı sorgu yerine 3 sorgu (geçmiş, dağılım, hisseler).
+export async function getFunds(codes: string[]): Promise<{ funds: Detail[]; holdings: Map<string, Holding[]> }> {
+  if (!codes.length) return { funds: [], holdings: new Map() };
+  const [h, a, hl] = await Promise.all([
+    pool.query(`SELECT code, kind, name, date::text, price, size, investors, shares FROM info WHERE code = ANY($1) ORDER BY code, date`, [codes]),
+    pool.query(`SELECT code, date::text, data FROM alloc WHERE code = ANY($1)`, [codes]),
+    pool.query(`SELECT code, ticker, weight FROM holdings WHERE code = ANY($1) ORDER BY weight DESC`, [codes]),
+  ]);
+  const hist = new Map<string, any[]>(), alloc = new Map(a.rows.map((r) => [r.code, r]));
+  for (const r of h.rows) (hist.get(r.code) ?? hist.set(r.code, []).get(r.code)!).push(r);
+  const holdings = new Map<string, Holding[]>();
+  for (const r of hl.rows) (holdings.get(r.code) ?? holdings.set(r.code, []).get(r.code)!).push({ ticker: r.ticker, weight: r.weight });
+  const funds = codes.filter((c) => hist.has(c)).map((code) => {
+    const rows = hist.get(code)!, last = rows[rows.length - 1];
+    return { code, name: last.name, kind: last.kind, history: rows, alloc: alloc.get(code)?.data ?? {}, allocDate: alloc.get(code)?.date ?? null } as Detail;
+  });
+  return { funds, holdings };
+}

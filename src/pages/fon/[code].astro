@@ -10,8 +10,7 @@ if (!f) return new Response("Fon bulunamadı", { status: 404 });
 const last = f.history[f.history.length - 1];
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
-const rivals = await peers(f.code, f.kind);
-const { holdings, report, published, note, seen } = await getHoldings(f.code);
+const [rivals, { holdings, report, published, note, seen }] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code)]);
 // Hisse tutan ama listesi olmayan fonlarda nedenini göster
 const stockPct = f.alloc.hs ?? 0;
 const why = holdings.length || stockPct <= 0 ? null

@@ -1,13 +1,13 @@
 ---
 import Base from "../layouts/Base.astro";
 import CompareChart from "../components/CompareChart";
-import { getFund, getHoldings } from "../lib/db";
+import { getFunds } from "../lib/db";
 import { ret, RETURNS } from "../lib/analytics";
 import { label, pct, tl, tone } from "../lib/format";
 
 const codes = [...new Set((Astro.url.searchParams.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 10);
-const funds = (await Promise.all(codes.map(getFund))).filter((f) => f != null);
-const hold = await Promise.all(funds.map((f) => getHoldings(f.code)));
+const { funds, holdings } = await getFunds(codes);
+const hold = funds.map((f) => ({ holdings: holdings.get(f.code) ?? [] }));
 const tickers = [...new Set(hold.flatMap((h) => h.holdings.slice(0, 15).map((x) => x.ticker)))]
   .sort((a, b) => Math.max(...hold.map((h) => h.holdings.find((x) => x.ticker === b)?.weight ?? 0)) - Math.max(...hold.map((h) => h.holdings.find((x) => x.ticker === a)?.weight ?? 0))).slice(0, 25);
 const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
