@@ -18,3 +18,6 @@ CREATE TABLE IF NOT EXISTS holdings_meta (code text PRIMARY KEY, disclosure_inde
 CREATE TABLE IF NOT EXISTS kap_scanned (day date PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS kap_pdr (disclosure_index int PRIMARY KEY, code text NOT NULL, published date, rule text, title text);
 CREATE INDEX IF NOT EXISTS kap_pdr_code ON kap_pdr (code, disclosure_index DESC);
+-- note: rapor okunamadıysa nedeni ('muaf' nitelikli fon, 'okunamadi'); v: ayrıştırıcı sürümü (artınca yeniden işlenir)
+ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS note text;
+ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS v int NOT NULL DEFAULT 1;

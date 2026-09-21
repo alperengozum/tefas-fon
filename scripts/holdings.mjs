@@ -7,6 +7,7 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const KAP = "https://www.kap.org.tr/tr/";
 const HDR = { "Content-Type": "application/json", Referer: KAP, "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146.0 Safari/537.36" };
+const norm = (s) => s.toUpperCase().replace(/İ/g, "I").replace(/[ÖÜŞÇĞ]/g, (c) => ({ Ö: "O", Ü: "U", Ş: "S", Ç: "C", Ğ: "G" })[c]).replace(/[^A-Z0-9]/g, "");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ymd = (d) => d.toISOString().slice(0, 10);
 const num = (s) => Number(s.replace(/\./g, "").replace(",", "."));
@@ -30,7 +31,7 @@ async function kap(path, opts, tries = 6) {
 }
 
 // PDF -> satırlar (aynı y'deki hücreler soldan sağa)
-async function pdfLines(buf) {
+export async function pdfLines(buf) {
   const i = buf.indexOf("%PDF"); // KAP dosyaları başında Java serileştirme başlığı taşıyor
   const doc = await getDocument({ data: new Uint8Array(buf.subarray(i)), useSystemFonts: true, verbosity: 0 }).promise;
   const lines = [];
@@ -55,41 +56,64 @@ function toNum(s) {
   else if (ld >= 0) s = (s.match(/\./g).length === 1 && s.length - ld - 1 !== 3) ? s : s.replace(/\./g, "");
   return Number(s);
 }
-const START = /^(?:[A-ZÇ]\s*[.)-]\s*)?(?:H[İI]SSE SENETLER[İI]|PAY(?![A-Za-zÇĞİıÖŞÜçğöşü]))/i;
-const END = /^(?:GRUP TOPLAMI|[B-ZÇ]\s*\)\s*\S|[B-ZÇ]\s*[.)-]\s*(?:DEVLET|HAZ[İI]NE|ÖZEL|K[İI]RA|BORÇ|MEVDUAT|TERS REPO|REPO|YATIRIM FON|BORSA|TÜREV|V[İI]OP|KATILIM|DÖV[İI]Z|YABANCI|ALTIN|DE[ĞG]ERL[İI]))/i;
+// Başlık iki satıra bölünebiliyor ("A) HİSSE" / "SENETLERİ"): önceki satırla birleştirip bak.
+const START = /^(?:[A-ZÇ]\s*[.)-]\s*)?(?:H[İI]SSE SENETLER[İI]|PAY)\s*:?\s*$/i;
+const END = /^(?:GRUP TOPLAMI|[B-ZÇ]\s*\)\s*\S|[B-ZÇ]\s*[.)-]\s*(?:DEVLET|HAZ[İI]NE|ÖZEL|K[İI]RA|BORÇ|MEVDUAT|TERS REPO|REPO|YATIRIM FON|BORSA|TÜREV|V[İI]OP|KATILIM|DÖV[İI]Z|YABANCI|ALTIN|DE[ĞG]ERL[İI]))|SATIŞ/i;
+const FOREIGN_ISIN = /^(?!TR)[A-Z]{2}[A-Z0-9]{9}\d$/;
 
-// PDR'nin hisse tablosu. Şirketlere göre sütun düzeni değiştiği için ağırlık sütunu, sütun toplamının TEFAS'ın hisse %'sine (expected)
-// en yakın olduğu sütun seçilir; hiçbiri tutmuyorsa null (yanlış veri yazmaktansa atla). Kısa pozisyonlar (negatif) net edilir.
-export async function parsePdr(buf, expected) {
+// PDR'nin hisse tablosu satırları + bölümün "GRUP TOPLAMI" satırı (varsa; kendi içinde tutarlılık kontrolü için).
+export function parseRows(lines) {
   const rows = [];
-  let inStock = false;
-  for (const cells of await pdfLines(buf)) {
+  let inStock = false, grp = null, prev = "";
+  for (const cells of lines) {
     const line = cells.join(" ").trim();
     const nums = cells.slice(1).filter((x) => NUM.test(x) && /\d/.test(x));
-    if (!nums.length && START.test(line)) { inStock = true; continue; }
+    const head = START.test(cells[0]) || (!nums.length && (START.test(line) || (line.length < 12 && START.test(prev + " " + line))));
+    prev = nums.length ? "" : line;
+    if (head) { inStock = true; continue; }
     if (!inStock) continue;
+    if (/^GRUP TOPLAMI/i.test(line)) { grp = cells.filter((x) => NUM.test(x) && /\d/.test(x)).map(toNum); inStock = false; continue; }
     if (!nums.length && END.test(line)) { inStock = false; continue; }
-    if (/^GRUP TOPLAMI/i.test(line)) { inStock = false; continue; }
+    if (cells.some((x) => FOREIGN_ISIN.test(x))) continue; // yabancı hisse: TEFAS "hisse %"ine dahil değil
     const t = cells[0].replace(/^\d+\s+/, "").replace(/\.[A-Z]$/, "");
     if (!/^[A-Z][A-Z0-9]{2,5}$/.test(t) || /^(TOPLAM|GRUP|REPO|TPP|BPP)$/.test(t) || nums.length < 2) continue;
     rows.push({ t, v: nums.map(toNum) });
   }
+  return { rows, grp };
+}
+
+// Ağırlık sütununu seç. 1) PDF'in kendi grup toplamıyla tutan sütun (sağdan: FTD, sonra FPD);
+// 2) yoksa yüzde gibi görünen sütunlardan toplamı TEFAS'ın hisse %'sine en yakın olan (rapor eski olabildiği için geniş tolerans).
+export function pickColumn({ rows, grp }, expected) {
   if (!rows.length) return null;
+  const R = (r, j) => r.v[r.v.length - 1 - j];
+  if (grp)
+    for (let j = 0; j < Math.min(grp.length, 3); j++) {
+      const g = grp[grp.length - 1 - j];
+      if (rows.some((r) => R(r, j) === undefined)) continue;
+      const sum = rows.reduce((s, r) => s + R(r, j), 0);
+      if (g > 0 && g <= 250 && Math.abs(sum - g) <= Math.max(0.3, g * 0.03)) return { how: "grup", at: (r) => R(r, j) };
+    }
   let best = null;
   for (const side of ["L", "R"])
     for (let j = 0; j < 9; j++) {
-      const at = (r) => (side === "L" ? r.v[j] : r.v[r.v.length - 1 - j]);
-      if (rows.some((r) => at(r) === undefined || !isFinite(at(r)))) continue;
-      const err = Math.abs(rows.reduce((s, r) => s + at(r), 0) - expected);
-      if (!best || err < best.err) best = { err, at };
+      const at = (r) => (side === "L" ? r.v[j] : R(r, j));
+      if (rows.some((r) => at(r) === undefined || !isFinite(at(r)) || Math.abs(at(r)) > 200)) continue;
+      const sum = rows.reduce((s, r) => s + at(r), 0), err = Math.abs(sum - expected);
+      if (sum <= 250 && (!best || err < best.err)) best = { how: "tefas", err, at };
     }
-  if (!best || best.err > Math.max(4, expected * 0.15)) return null;
+  return best && best.err <= Math.max(6, expected * 0.3) ? best : null;
+}
+
+export async function parsePdr(buf, expected) {
+  const parsed = parseRows(await pdfLines(buf));
+  const best = pickColumn(parsed, expected);
+  if (!best) return null;
   const out = new Map();
-  for (const r of rows) out.set(r.t, (out.get(r.t) ?? 0) + best.at(r));
+  for (const r of parsed.rows) out.set(r.t, (out.get(r.t) ?? 0) + best.at(r));
   return [...out].map(([ticker, weight]) => ({ ticker, weight })).filter((h) => h.weight > 0.005).sort((a, b) => b.weight - a.weight);
 }
 
-// Günlük pencerelerle KAP'ı tara; sonuçlar kalıcı (kap_pdr/kap_scanned). Engellenirse ertesi çalıştırmada kaldığı yerden devam eder.
 async function discover(db, days) {
   for (let i = 0; i < days; i++) {
     const d = ymd(new Date(Date.now() - i * 864e5));
@@ -107,12 +131,15 @@ async function discover(db, days) {
   return (await db.query("SELECT DISTINCT ON (code) code, disclosure_index, published::text AS published, rule, title FROM kap_pdr ORDER BY code, disclosure_index DESC")).rows;
 }
 
+// KAP ekindeki PDF; ek yoksa gövdeye bak: nitelikli yatırımcı fonları rapordan muaf tutulur (veri hiç yok).
 async function fetchPdf(index) {
   const [d] = await (await kap(`api/notification/attachment-detail/${index}`)).json();
   const att = d?.attachments?.find((a) => /pdf/i.test(a.fileExtension ?? a.fileName ?? "")) ?? d?.attachments?.[0];
-  if (!att) return null;
-  return Buffer.from(await (await kap(`api/file/download/${att.objId}`)).arrayBuffer());
+  if (!att) return { buf: null, note: /muaf/i.test((d?.disclosureBody ?? []).join(" ")) ? "muaf" : "okunamadi" };
+  return { buf: Buffer.from(await (await kap(`api/file/download/${att.objId}`)).arrayBuffer()), note: null };
 }
+
+const PARSER_V = 3; // ayrıştırıcı iyileşince artır: eski sürümle işlenen fonlar yeniden okunur
 
 async function main() {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
@@ -122,27 +149,32 @@ async function main() {
   // sadece hisse tutan fonlar (TEFAS dağılımında hisse > 0)
   const { rows: eq } = await db.query("SELECT code, (data->>'hs')::float8 AS hs FROM alloc WHERE COALESCE((data->>'hs')::float8, 0) > 0");
   const want = new Map(eq.map((r) => [r.code, r.hs]));
-  const have = new Map((await db.query("SELECT code, disclosure_index FROM holdings_meta")).rows.map((r) => [r.code, r.disclosure_index]));
-  const todo = (await discover(db, days)).filter((x) => want.has(x.code) && x.disclosure_index > (have.get(x.code) ?? 0));
+  const have = new Map((await db.query("SELECT code, disclosure_index, v FROM holdings_meta")).rows.map((r) => [r.code, r]));
+  // KAP kodu TEFAS kodundan farklı olabilir (BYF'lerde borsa kodu); önce kod, sonra tam ad eşleşmesi
+  const names = new Map((await db.query("SELECT DISTINCT ON (code) code, name FROM info ORDER BY code, date DESC")).rows.map((r) => [norm(r.name), r.code]));
+  const todo = (await discover(db, days))
+    .map((x) => ({ ...x, tefas: want.has(x.code) ? x.code : names.get(norm(x.title)) }))
+    .filter((x) => x.tefas && want.has(x.tefas) && (!have.has(x.tefas) || x.disclosure_index > have.get(x.tefas).disclosure_index || have.get(x.tefas).v < PARSER_V));
   console.log(`taranan ${days} gün, işlenecek ${todo.length} fon`);
   let done = 0, failed = 0, skipped = 0;
   // ponytail: 2 worker (indirme+PDF ayrıştırma örtüşsün), hız kapıdan sınırlı
   await Promise.all(Array.from({ length: 2 }, async () => {
     for (let x; (x = todo.pop()); ) {
       try {
-        // İş Portföy PDF'leri taranmış görüntü (metin yok): indirmeden atla
-        const buf = x.title.startsWith("İŞ PORTFÖY") ? null : await fetchPdf(x.disclosure_index);
-        const hs = buf ? await parsePdr(buf, want.get(x.code)) : null;
-        // hs null: PDF düzeni tanınmadı / toplam TEFAS ile tutmadı -> holdings boş, rapor işaretlenir (her gün yeniden indirilmesin)
+        // İş Portföy PDF'lerinde yazı vektör çizgi olarak çizilmiş (metin yok, OCR güvenilmez): indirmeden atla
+        let buf = null, note = "okunamadi";
+        if (!x.title.startsWith("İŞ PORTFÖY")) ({ buf, note } = await fetchPdf(x.disclosure_index));
+        const hs = buf ? await parsePdr(buf, want.get(x.tefas)) : null;
+        // hs null: PDF okunamadı / düzen tanınmadı -> holdings boş, rapor işaretlenir (her gün yeniden indirilmesin)
         const c = await db.connect();
         try {
           await c.query("BEGIN");
-          await c.query("DELETE FROM holdings WHERE code=$1", [x.code]);
+          await c.query("DELETE FROM holdings WHERE code=$1", [x.tefas]);
           if (hs?.length)
-            await c.query("INSERT INTO holdings SELECT $1, * FROM unnest($2::text[], $3::float8[])", [x.code, hs.map((h) => h.ticker), hs.map((h) => h.weight)]);
+            await c.query("INSERT INTO holdings SELECT $1, * FROM unnest($2::text[], $3::float8[])", [x.tefas, hs.map((h) => h.ticker), hs.map((h) => h.weight)]);
           await c.query(
-            "INSERT INTO holdings_meta VALUES ($1,$2,$3,$4::date) ON CONFLICT (code) DO UPDATE SET disclosure_index=$2, report=$3, published=$4::date",
-            [x.code, x.disclosure_index, hs ? x.rule : null, x.published]);
+            "INSERT INTO holdings_meta (code, disclosure_index, report, published, note, v) VALUES ($1,$2,$3,$4::date,$5,$6) ON CONFLICT (code) DO UPDATE SET disclosure_index=$2, report=$3, published=$4::date, note=$5, v=$6",
+            [x.tefas, x.disclosure_index, hs ? x.rule : null, x.published, hs ? null : note ?? "okunamadi", PARSER_V]);
           await c.query("COMMIT");
         } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
         if (!hs) skipped++;

@@ -92,12 +92,12 @@ export async function peers(code: string, kind: string, n = 8) {
 
 export type Holding = { ticker: string; weight: number };
 
-export async function getHoldings(code: string): Promise<{ holdings: Holding[]; report: string | null; published: string | null }> {
+export async function getHoldings(code: string): Promise<{ holdings: Holding[]; report: string | null; published: string | null; note: string | null; seen: boolean }> {
   const [h, m] = await Promise.all([
     pool.query(`SELECT ticker, weight FROM holdings WHERE code=$1 ORDER BY weight DESC`, [code]),
-    pool.query(`SELECT report, published::text FROM holdings_meta WHERE code=$1`, [code]),
+    pool.query(`SELECT report, published::text, note FROM holdings_meta WHERE code=$1`, [code]),
   ]);
-  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null };
+  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: m.rowCount > 0 };
 }
 
 // Hisse filtresi: `ticker`ı en az `min` % ağırlıkla tutan fonlar -> {kod: ağırlık}

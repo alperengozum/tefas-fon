@@ -11,7 +11,15 @@ const last = f.history[f.history.length - 1];
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
 const rivals = await peers(f.code, f.kind);
-const { holdings, report, published } = await getHoldings(f.code);
+const { holdings, report, published, note, seen } = await getHoldings(f.code);
+// Hisse tutan ama listesi olmayan fonlarda nedenini göster
+const stockPct = f.alloc.hs ?? 0;
+const why = holdings.length || stockPct <= 0 ? null
+  : f.kind === "EMK" ? "BES fonlarının hisse bazlı portföyü KAP'ta yayımlanmıyor."
+  : note === "muaf" ? "Nitelikli yatırımcı fonu: KAP portföy dağılım raporundan muaf, hisse listesi yayımlanmıyor."
+  : f.name.startsWith("İŞ PORTFÖY") ? "İş Portföy raporları görüntü olarak yayımlanıyor (metin yok), okunamıyor."
+  : seen ? "KAP portföy raporu bulundu ama tablo düzeni okunamadı."
+  : "KAP'ta bu fon için portföy dağılım raporu bulunamadı.";
 const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 ---
 <Base title={`${f.code} · TEFAS Fon Analiz`}>
@@ -54,6 +62,8 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
       </div>
     </section>
   )}
+
+  {why && <p class="mb-8 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"><b>Hisse portföyü yok:</b> {why}</p>}
 
   <div class="grid gap-8 md:grid-cols-2">
     <section>

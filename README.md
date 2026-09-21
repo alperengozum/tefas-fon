@@ -23,7 +23,7 @@ Hisse portföyü: `npm run holdings` — KAP'ın haftalık/aylık "Portföy Dağ
 
 ## Sınırlar (TEFAS API'sinde olmayan veriler)
 Yönetim ücreti, stopaj, KAP akışı, BIST/dolar/altın benchmark yok.
-Hisse portföyü sadece KAP PDR'si okunabilen fonlarda var: BES fonları KAP'ta bu formatta yok, İş Portföy PDF'leri taranmış görüntü (OCR yok), bazı şirketlerin tablo düzeni tanınmıyor; ağırlıklar TEFAS hisse %'siyle tutarlı değilse fon atlanır.
+Hisse portföyü KAP PDR'lerinden gelir; verinin hiç olmadığı gruplar: BES fonları (KAP'ta rapor yok), nitelikli yatırımcı (özel) fonları (rapordan muaf), yazısı vektör çizili PDF yayımlayanlar (İş, Nurol, EMAA Blue, kısmen Osmanlı — OCR güvenilmez). Kalanların ~%75'i okunur; ağırlık sütunu PDF'in kendi grup toplamıyla doğrulanır, olmazsa TEFAS hisse %'sine bakılır. `npm test` ayrıştırıcıyı gerçek PDF'lerle sınar.
 Nakit akışı = pay sayısı değişimi × güncel fiyat (yaklaşık). Kategori = en büyük varlık kalemi. Varlık dağılımı sadece son gün.
 
 ## Deploy (Coolify)
