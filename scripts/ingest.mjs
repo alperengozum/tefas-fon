@@ -15,6 +15,7 @@ const addDays = (d, n) => new Date(d.getTime() + n * 864e5);
 
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
 await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
+if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece şema
 
 // ponytail: sabit 11sn aralık (TEFAS: dk'da 6 istek), hatada 65sn bekle. İstek başı max ~1 ay.
 let last = 0;

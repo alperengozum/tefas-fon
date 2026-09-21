@@ -17,6 +17,6 @@ const { ref, funds } = await listFunds(k[0]);
     <span class="text-sm text-muted-foreground">Veri tarihi: {ref || "–"} · {funds.length} fon</span>
   </div>
   {funds.length === 0
-    ? <p class="text-muted-foreground">Veri yok. <code>npm run ingest</code> çalıştırın.</p>
+    ? <p class="text-muted-foreground">Veri henüz yüklenmedi; ilk yükleme ~20 dk sürer (TEFAS rate limit). Sayfayı sonra yenileyin.</p>
     : <FundTable client:load funds={funds} />}
 </Base>
