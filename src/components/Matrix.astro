@@ -1,0 +1,18 @@
+---
+// Fon x fon ısı tablosu. kind "corr": -1..1 (mavi), "pct": 0..100 örtüşme (turuncu).
+const { codes, cells, kind } = Astro.props as { codes: string[]; cells: (number | null)[][]; kind: "corr" | "pct" };
+const bg = (v: number | null) => v == null ? "" : kind === "corr" ? `background:rgba(37,99,235,${(Math.abs(v) * 0.4).toFixed(2)})` : `background:rgba(217,119,6,${(Math.min(v / 40, 1) * 0.45).toFixed(2)})`;
+const fmt = (v: number | null) => v == null ? "–" : kind === "corr" ? v.toFixed(2) : `${v.toFixed(1)}%`;
+---
+<div class="overflow-x-auto rounded-lg border">
+  <table class="w-full text-sm tabular-nums">
+    <tbody>
+      <tr class="bg-muted/50"><th class="p-2"></th>{codes.map((c) => <th class="p-2 text-right"><a class="hover:underline" href={`/fon/${c}`}>{c}</a></th>)}</tr>
+      {codes.map((r, i) => (
+        <tr class="border-t"><th class="p-2 text-left font-medium"><a class="hover:underline" href={`/fon/${r}`}>{r}</a></th>
+          {codes.map((_, j) => <td class="p-2 text-right" style={i === j ? "" : bg(cells[i][j])}>{i === j ? "" : fmt(cells[i][j])}</td>)}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

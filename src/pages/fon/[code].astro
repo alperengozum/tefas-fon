@@ -2,16 +2,24 @@
 import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
-import { getFund, getFunds, getHoldings, peers } from "../../lib/db";
-import { forChart, ret, RETURNS } from "../../lib/analytics";
+import { getBench, getFund, getFunds, getHoldings, overlapping, peers } from "../../lib/db";
+import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
+import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
 import { label, pct, tl, tone } from "../../lib/format";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
 if (!f) return new Response("Fon bulunamadı", { status: 404 });
 const last = f.history[f.history.length - 1];
+const bench = await getBench();
+const benches = BENCH.filter(([s]) => bench[s]?.length);
+// beta/korelasyon: son 1 yıl günlük getiriler, BIST100'e göre
+const since = new Date(new Date(last.date).getTime() - 365 * 864e5).toISOString().slice(0, 10);
+const fr = dailyReturns(f.history, since), br = bench.BIST100 ? dailyReturns(bench.BIST100, since) : null;
+const [b100, c100] = br ? [beta(fr, br), corr(fr, br)] : [null, null];
+const roll = rolling(f.history, 91);
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
-const [rivals, { holdings, report, published, note, seen }] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code)]);
+const [rivals, { holdings, report, published, note, seen }, overl] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6)]);
 // Hisse tutan ama listesi olmayan fonlarda nedenini göster
 const stockPct = f.alloc.hs ?? 0;
 const why = holdings.length || stockPct <= 0 ? null
@@ -51,13 +59,43 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 
   <section class="mb-8"><FundCharts client:only="react" history={forChart(f.history, ["price", "size", "investors"])} /></section>
 
+  {benches.length > 0 && (
+    <section class="mb-8">
+      <h2 class="mb-3 font-semibold">Endekslere karşı <span class="text-xs font-normal text-muted-foreground">BIST 100, USD/TRY, gram altın (Yahoo Finance) · fon bunları geçti mi?</span></h2>
+      <div class="mb-3 overflow-x-auto rounded-lg border">
+        <table class="w-full text-sm tabular-nums">
+          <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left"></th>{RETURNS.map(([k]) => <th class="p-2">{k}</th>)}</tr></thead>
+          <tbody>
+            {[[f.code, f.history] as const, ...benches.map(([s, l]) => [l, bench[s]] as const)].map(([l, h], i) => (
+              <tr class={`border-t ${i === 0 ? "font-medium" : ""}`}><td class="p-2 text-left">{l}</td>{RETURNS.map(([, d]) => { const r = ret(h, d); return <td class={`p-2 text-right ${tone(r)}`}>{pct(r)}</td>; })}</tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {b100 != null && <p class="mb-3 text-sm text-muted-foreground">BIST 100'e göre beta <b class="text-foreground">{b100.toFixed(2)}</b> · korelasyon <b class="text-foreground">{c100?.toFixed(2)}</b> <span class="text-xs">(son 1 yıl, günlük getiriler; beta 1'den küçükse endeksten az oynak)</span></p>}
+      <CompareChart client:only="react" series={[{ code: f.code, name: f.name, history: forChart(f.history, ["price"]) }, ...benches.map(([s, l]) => ({ code: s, name: l, history: forChart(bench[s], ["price"]) }))]} />
+    </section>
+  )}
+
+  {roll && (
+    <section class="mb-8">
+      <h2 class="mb-3 font-semibold">Kayan 3 aylık getiri <span class="text-xs font-normal text-muted-foreground">herhangi bir günde 3 ay tutsaydın · {roll.n} pencere</span></h2>
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[["En kötü", pct(roll.min), roll.min], ["Medyan", pct(roll.median), roll.median], ["En iyi", pct(roll.max), roll.max]].map(([k, v, n]) => (
+          <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class={`font-medium tabular-nums ${tone(n as number)}`}>{v}</div></div>
+        ))}
+        <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Kazandıran pencere</div><div class="font-medium tabular-nums">{roll.pos.toFixed(0)}%</div></div>
+      </div>
+    </section>
+  )}
+
   {holdings.length > 0 && (
     <section class="mb-8">
       <h2 class="mb-3 font-semibold">Hisse portföyü <span class="text-xs font-normal text-muted-foreground">KAP Portföy Dağılım Raporu · {report} · yayın {published} · portföy değerine oran</span></h2>
       <div class="grid gap-x-8 gap-y-1.5 text-sm md:grid-cols-2">
         {holdings.map((h) => (
           <div>
-            <div class="flex justify-between"><a class="font-medium hover:underline" href={`/fonlar/yat?hisse=${h.ticker}`}>{h.ticker}</a><span class="tabular-nums">{h.weight.toFixed(2)}%</span></div>
+            <div class="flex justify-between"><a class="font-medium hover:underline" href={`/hisse/${h.ticker}`}>{h.ticker}</a><span class="tabular-nums">{h.weight.toFixed(2)}%</span></div>
             <div class="h-1.5 rounded bg-muted"><div class="h-1.5 rounded bg-primary" style={`width:${Math.min(h.weight, 100)}%`} /></div>
           </div>
         ))}
@@ -95,5 +133,13 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
       </ul>
       {rivals.length > 0 && <a class="mt-3 inline-block text-sm underline" href={`/karsilastir?codes=${[f.code, ...rivals.slice(0, 4).map((r) => r.code)].join(",")}`}>İlk 4 rakiple karşılaştır</a>}
     </section>
+    {overl.length > 0 && (
+      <section>
+        <h2 class="mb-3 font-semibold">Hisse portföyü en çok örtüşen fonlar <span class="text-xs font-normal text-muted-foreground">ortak hisselerin ağırlık toplamı (min)</span></h2>
+        <ul class="space-y-1 text-sm">
+          {overl.map((r) => <li class="flex justify-between gap-3"><a class="min-w-0 truncate hover:underline" href={`/karsilastir?codes=${f.code},${r.code}`}><b>{r.code}</b> {r.name}</a><span class="tabular-nums">{r.ov.toFixed(1)}%</span></li>)}
+        </ul>
+      </section>
+    )}
   </div>
 </Base>

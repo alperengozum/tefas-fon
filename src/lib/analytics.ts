@@ -1,7 +1,5 @@
-import type { Detail } from "./db";
-
 // `days` gün önceki (ytd: yıl başından önceki) son fiyata göre getiri %
-export function ret(h: Detail["history"], days: number | "ytd"): number | null {
+export function ret(h: { date: string; price: number }[], days: number | "ytd"): number | null {
   const last = h[h.length - 1];
   if (!last) return null;
   const cut = days === "ytd"
@@ -20,3 +18,6 @@ export function forChart<T extends { date: string }, K extends keyof T>(h: T[], 
 }
 
 export const RETURNS: [string, number | "ytd"][] = [["1H", 7], ["1A", 30], ["3A", 91], ["6A", 182], ["YBB", "ytd"], ["1Y", 365], ["2Y", 730], ["3Y", 1095], ["5Y", 1825]];
+
+// Benchmark seri kodları (bench tablosundaki sym) ve görünen adları
+export const BENCH: [string, string][] = [["BIST100", "BIST 100"], ["USD", "USD/TRY"], ["ALTIN", "Gram altın"]];

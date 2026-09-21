@@ -1,12 +1,22 @@
 ---
 import Base from "../layouts/Base.astro";
 import CompareChart from "../components/CompareChart";
-import { getFunds } from "../lib/db";
-import { forChart, ret, RETURNS } from "../lib/analytics";
+import Matrix from "../components/Matrix.astro";
+import { getBench, getFunds } from "../lib/db";
+import { BENCH, forChart, ret, RETURNS } from "../lib/analytics";
+import { corr, dailyReturns, overlap } from "../lib/stats";
 import { label, pct, tl, tone } from "../lib/format";
 
 const codes = [...new Set((Astro.url.searchParams.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 10);
-const { funds, holdings } = await getFunds(codes);
+const endeks = Astro.url.searchParams.get("endeks") === "1";
+const [{ funds, holdings }, bench] = await Promise.all([getFunds(codes), endeks ? getBench() : Promise.resolve({} as Awaited<ReturnType<typeof getBench>>)]);
+// son 1 yıl günlük getiri korelasyonu; hisse örtüşmesi: ikisinin de listesi olan fon çiftleri
+const since = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+const rets = funds.map((f) => dailyReturns(f.history, since));
+const ids = funds.map((f) => f.code);
+const cors = rets.map((a) => rets.map((b) => corr(a, b)));
+const ovl = funds.map((a) => funds.map((b) => { const x = holdings.get(a.code), y = holdings.get(b.code); return x?.length && y?.length ? overlap(x, y) : null; }));
+const hasOvl = ovl.some((r, i) => r.some((v, j) => i !== j && v != null));
 const hold = funds.map((f) => ({ holdings: holdings.get(f.code) ?? [] }));
 const tickers = [...new Set(hold.flatMap((h) => h.holdings.slice(0, 15).map((x) => x.ticker)))]
   .sort((a, b) => Math.max(...hold.map((h) => h.holdings.find((x) => x.ticker === b)?.weight ?? 0)) - Math.max(...hold.map((h) => h.holdings.find((x) => x.ticker === a)?.weight ?? 0))).slice(0, 25);
@@ -18,11 +28,19 @@ const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
   <form class="mb-6 flex flex-wrap gap-2" method="get">
     <input name="codes" value={codes.join(",")} placeholder="Fon kodları, virgülle (ör. AFT,TCD,MAC)" class="h-8 w-full rounded-lg sm:w-96 border bg-transparent px-2 text-sm" />
     <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Karşılaştır</button>
+    <label class="flex items-center gap-1 self-center text-sm"><input type="checkbox" name="endeks" value="1" checked={endeks} /> BIST100 / USD / altın ekle</label>
     <span class="self-center text-xs text-muted-foreground">en fazla 10 fon</span>
   </form>
   {funds.length === 0 ? <p class="text-muted-foreground">Fon listesinden kutucukları işaretleyin ya da kod girin.</p> : (
     <>
-      <section class="mb-8"><CompareChart client:only="react" series={funds.map((f) => ({ code: f.code, name: f.name, history: forChart(f.history, ["price"]) }))} /></section>
+      <section class="mb-8"><CompareChart client:only="react" series={[...funds.map((f) => ({ code: f.code, name: f.name, history: forChart(f.history, ["price"]) })), ...BENCH.filter(([k]) => bench[k]).map(([k, l]) => ({ code: k, name: l, history: forChart(bench[k], ["price"]) }))]} /></section>
+      {funds.length > 1 && (
+        <section class="mb-8 grid gap-6 lg:grid-cols-2">
+          <div><h2 class="mb-2 font-semibold">Getiri korelasyonu <span class="text-xs font-normal text-muted-foreground">son 1 yıl, günlük · 1'e yakınsa aynı yönde oynuyor, çeşitlendirme az</span></h2><Matrix codes={ids} cells={cors} kind="corr" /></div>
+          {hasOvl ? <div><h2 class="mb-2 font-semibold">Hisse örtüşmesi <span class="text-xs font-normal text-muted-foreground">ortak hisselerin ağırlık toplamı (min), portföy değerine %</span></h2><Matrix codes={ids} cells={ovl} kind="pct" /></div>
+            : <p class="self-center text-sm text-muted-foreground">Hisse örtüşmesi için en az iki fonun KAP hisse listesi gerekir.</p>}
+        </section>
+      )}
       <div class="mb-8 overflow-x-auto rounded-lg border">
         <table class="w-full text-sm">
           <thead class="bg-muted/50 text-left"><tr><th class="p-2">Metrik</th>{funds.map((f) => <th class="p-2 text-right"><a class="hover:underline" href={`/fon/${f.code}`}>{f.code}</a></th>)}</tr></thead>
@@ -39,7 +57,7 @@ const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
             ))}
             {tickers.length > 0 && <tr class="border-t bg-muted/30"><td class="p-2 font-medium" colspan={funds.length + 1}>En büyük hisse pozisyonları</td></tr>}
             {tickers.map((t) => (
-              <tr class="border-t"><td class="p-2"><a class="hover:underline" href={`/fonlar/yat?hisse=${t}`}>{t}</a></td>{hold.map((h) => { const w = h.holdings.find((x) => x.ticker === t)?.weight; return <td class="p-2 text-right">{w ? `${w.toFixed(2)}%` : "–"}</td>; })}</tr>
+              <tr class="border-t"><td class="p-2"><a class="hover:underline" href={`/hisse/${t}`}>{t}</a></td>{hold.map((h) => { const w = h.holdings.find((x) => x.ticker === t)?.weight; return <td class="p-2 text-right">{w ? `${w.toFixed(2)}%` : "–"}</td>; })}</tr>
             ))}
           </tbody>
         </table>

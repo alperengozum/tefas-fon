@@ -23,3 +23,5 @@ ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS note text;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS v int NOT NULL DEFAULT 1;
 -- fon başına yıllık volatilite (%); ingest sonunda bir kez hesaplanır (listeleme sorgusunda her istekte hesaplamak ~650ms sürüyordu)
 CREATE TABLE IF NOT EXISTS fund_vol (code text PRIMARY KEY, vol double precision NOT NULL, updated date NOT NULL);
+-- benchmark günlük kapanışları (Yahoo Finance): BIST100 (puan), USD (USD/TRY), ALTIN (gram altın TL)
+CREATE TABLE IF NOT EXISTS bench (sym text NOT NULL, date date NOT NULL, price double precision NOT NULL, PRIMARY KEY (sym, date));
