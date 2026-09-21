@@ -16,6 +16,7 @@ const addDays = (d, n) => new Date(d.getTime() + n * 864e5);
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
 await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
 if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece şema
+if (process.argv[2] === "vol") { await computeVol(); await db.end(); process.exit(0); } // sadece volatilite
 
 // ponytail: sabit 11sn aralık (TEFAS: dk'da 6 istek), hatada 65sn bekle. İstek başı max ~1 ay.
 let last = 0;
@@ -40,6 +41,23 @@ async function post(endpoint, kind, start, end) {
     }
   }
   throw new Error("TEFAS yanıt vermiyor");
+}
+
+// Yıllık volatilite: son 1 yılın günlük getiri std sapması x sqrt(252). Tüm fonlar tek geçişte, listeleme sayfası sadece okur.
+async function computeVol() {
+  const c = await db.connect();
+  try {
+    await c.query("BEGIN");
+    await c.query("SET LOCAL work_mem = '64MB'"); // sıralama diske taşmasın
+    await c.query(`INSERT INTO fund_vol (code, vol, updated)
+      SELECT code, stddev_samp(r) * sqrt(252) * 100, CURRENT_DATE FROM (
+        SELECT code, price / NULLIF(lag(price) OVER (PARTITION BY code ORDER BY date), 0) - 1 AS r
+        FROM info WHERE date > (SELECT max(date) FROM info) - 365) t
+      WHERE r IS NOT NULL GROUP BY code HAVING count(*) > 20
+      ON CONFLICT (code) DO UPDATE SET vol = EXCLUDED.vol, updated = EXCLUDED.updated`);
+    await c.query("COMMIT");
+  } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
+  console.log("volatilite güncellendi");
 }
 
 async function save(kind, rows) {
@@ -94,4 +112,5 @@ for (const kind of KINDS) {
     console.log(kind, "anchor", n, ymd(from), ymd(target), rows.length);
   }
 }
+await computeVol();
 await db.end();

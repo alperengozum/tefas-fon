@@ -16,6 +16,11 @@ Günlük güncelleme için `npm run ingest`'i cron'a koyun.
 
 Hisse portföyü: `npm run holdings` — KAP'ın haftalık/aylık "Portföy Dağılım Raporu" PDF'lerinden hisse ağırlıklarını çıkarır (KAP 429 verdiği için yavaş: ilk çalıştırma ~30 dk).
 
+## Performans notları
+- Volatilite (risk) her istekte değil ingest sonunda `fund_vol` tablosuna hesaplanır (`npm run ingest -- vol`); liste sorgusu 0,7 sn → 60 ms.
+- Liste sonucu tür başına 5 dk bellekte tutulur; tabloya giden veri sıkıştırılmıştır (`src/lib/compact.ts`): HTML 2,6 MB → ~0,75 MB (gzip ~145 KB).
+- Arama/filtre `useDeferredValue` ile ertelenir; arka plan işleri `nice` ile düşük öncelikli.
+
 ## Sayfalar
 - `/fonlar/{yat,bes,byf,gyf}` — liste; Getiri / Büyüklük / Nakit Giriş-Çıkışı sekmeleri, arama, kategori, min büyüklük/yatırımcı/hisse % filtresi
 - `/fon/KOD` — detay: getiri, nakit akışı, fiyat/büyüklük/yatırımcı grafiği, varlık dağılımı, rakip fonlar

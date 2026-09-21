@@ -2,6 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import FundTable from "../../components/FundTable";
 import { listFunds } from "../../lib/db";
+import { encodeFunds } from "../../lib/compact";
 
 const KINDS: Record<string, [string, string]> = {
   yat: ["YAT", "Yatırım Fonları"], bes: ["EMK", "Emeklilik Fonları (BES)"],
@@ -18,5 +19,5 @@ const { ref, funds } = await listFunds(k[0]);
   </div>
   {funds.length === 0
     ? <p class="text-muted-foreground">Veri henüz yüklenmedi; ilk yükleme ~20 dk sürer (TEFAS rate limit). Sayfayı sonra yenileyin.</p>
-    : <FundTable client:load funds={funds} />}
+    : <FundTable client:load data={encodeFunds(funds)} />}
 </Base>

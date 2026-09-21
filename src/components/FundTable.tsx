@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { Fund } from "../lib/db";
+import { decodeFunds } from "../lib/compact";
 import { label, pct, tl, tone } from "../lib/format";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -41,7 +42,8 @@ function Pick({ value, onChange, all, items, className }: { value: string; onCha
   );
 }
 
-export default function FundTable({ funds }: { funds: Fund[] }) {
+export default function FundTable({ data }: { data: string }) {
+  const funds = useMemo(() => decodeFunds(data), [data]);
   const [view, setView] = useState("getiri");
   const [f, setF] = useState(EMPTY);
   const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
@@ -70,25 +72,27 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
     };
   }, [funds]);
 
+  // yazarken girdi hemen güncellenir, 2000 satırlık filtre/sıralama ertelenmiş değerle yapılır
+  const df = useDeferredValue(f);
   const rows = useMemo(() => {
-    const s = f.q.trim().toLocaleLowerCase("tr");
+    const s = df.q.trim().toLocaleLowerCase("tr");
     const n = (v: string) => (v === "" ? null : Number(v));
-    const [riskMin, riskMax, invMin, invMax, sizeMin, sizeMax, stockMin] = [f.riskMin, f.riskMax, f.invMin, f.invMax, f.sizeMin, f.sizeMax, f.stockMin].map(n);
+    const [riskMin, riskMax, invMin, invMax, sizeMin, sizeMax, stockMin] = [df.riskMin, df.riskMax, df.invMin, df.invMax, df.sizeMin, df.sizeMax, df.stockMin].map(n);
     return funds
       .filter((x) =>
-        (!s || (x.code + x.name).toLocaleLowerCase("tr").includes(s)) &&
-        (!f.type || x.type === f.type) && (!f.founder || x.founder === f.founder) && (!f.cat || x.main === f.cat) &&
-        f.flags.every((k) => x[k as keyof Fund]) &&
+        (!s || x.hay.includes(s)) &&
+        (!df.type || x.type === df.type) && (!df.founder || x.founder === df.founder) && (!df.cat || x.main === df.cat) &&
+        df.flags.every((k) => x[k as keyof Fund]) &&
         (riskMin == null || (x.risk != null && x.risk >= riskMin)) && (riskMax == null || (x.risk != null && x.risk <= riskMax)) &&
         (invMin == null || (x.investors ?? 0) >= invMin) && (invMax == null || (x.investors ?? 0) <= invMax) &&
         (sizeMin == null || x.size >= sizeMin * 1e6) && (sizeMax == null || x.size <= sizeMax * 1e6) &&
         (stockMin == null || x.stock >= stockMin) &&
-        (f.stock.trim().length < 2 || (byStock != null && x.code in byStock)))
+        (df.stock.trim().length < 2 || (byStock != null && x.code in byStock)))
       .sort((a, b) => {
         const x = a[sort.key] as any, y = b[sort.key] as any;
         return (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
       });
-  }, [funds, f, sort, byStock]);
+  }, [funds, df, sort, byStock]);
 
   // Kategori bazında net nakit girişi (1 ay), filtrelenmiş fonlar üzerinden
   const byCat = useMemo(() => {

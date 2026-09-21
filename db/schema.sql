@@ -21,3 +21,5 @@ CREATE INDEX IF NOT EXISTS kap_pdr_code ON kap_pdr (code, disclosure_index DESC)
 -- note: rapor okunamadıysa nedeni ('muaf' nitelikli fon, 'okunamadi'); v: ayrıştırıcı sürümü (artınca yeniden işlenir)
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS note text;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS v int NOT NULL DEFAULT 1;
+-- fon başına yıllık volatilite (%); ingest sonunda bir kez hesaplanır (listeleme sorgusunda her istekte hesaplamak ~650ms sürüyordu)
+CREATE TABLE IF NOT EXISTS fund_vol (code text PRIMARY KEY, vol double precision NOT NULL, updated date NOT NULL);

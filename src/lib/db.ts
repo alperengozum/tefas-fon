@@ -18,7 +18,7 @@ export type Fund = {
 const PERIODS: Record<string, string> = { d1: "1", w1: "7", m1: "30", m3: "91", m6: "182", y1: "365", y2: "730", y3: "1095", y5: "1825" };
 const FLOWS = ["w1", "m1", "m3"];
 
-export async function listFunds(kind: string): Promise<{ ref: string; funds: Fund[] }> {
+async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }> {
   const dates = Object.entries(PERIODS)
     .map(([k, n]) => `SELECT '${k}' k, (SELECT max(date) FROM info WHERE date <= ref.d - ${n}) d FROM ref`)
     .concat(`SELECT 'ytd', (SELECT max(date) FROM info WHERE date < date_trunc('year', ref.d)) FROM ref`)
@@ -27,32 +27,33 @@ export async function listFunds(kind: string): Promise<{ ref: string; funds: Fun
   const joins = keys.map((k) => `LEFT JOIN info o_${k} ON o_${k}.code = c.code AND o_${k}.date = (SELECT d FROM pd WHERE k='${k}')`).join("\n");
   const rets = keys.map((k) => `(c.price / NULLIF(o_${k}.price, 0) - 1) * 100 AS ${k}`).join(", ");
   const flows = FLOWS.map((k) => `(c.shares - o_${k}.shares) * c.price AS flow_${k}`).join(", ");
-  const [{ rows }, { rows: vols }] = await Promise.all([pool.query(
+  const { rows } = await pool.query(
     `WITH ref AS (SELECT max(date) d FROM info), pd AS (${dates})
      SELECT c.code, c.kind, c.name, c.price, c.size, c.investors, ref.d::text AS ref,
-            m.main, COALESCE((a.data->>'hs')::float8, 0) AS stock, ${rets}, ${flows}
+            m.main, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, ${rets}, ${flows}
      FROM info c CROSS JOIN ref
      ${joins}
      LEFT JOIN alloc a ON a.code = c.code
+     LEFT JOIN fund_vol v ON v.code = c.code
      LEFT JOIN LATERAL (SELECT key AS main FROM jsonb_each_text(a.data) ORDER BY value::float8 DESC LIMIT 1) m ON true
      WHERE c.kind = $1 AND c.date = ref.d AND c.size IS NOT NULL
      ORDER BY c.size DESC`,
     [kind],
-  ),
-  // yıllık volatilite: son 1 yılın günlük getiri std sapması × √252
-  pool.query(
-    `SELECT code, stddev_samp(r) * sqrt(252) * 100 AS vol FROM (
-       SELECT code, price / NULLIF(lag(price) OVER (PARTITION BY code ORDER BY date), 0) - 1 AS r
-       FROM info WHERE kind = $1 AND date > (SELECT max(date) FROM info) - 365) t
-     WHERE r IS NOT NULL GROUP BY code HAVING count(*) > 20`,
-    [kind],
-  )]);
-  const vol = new Map<string, number>(vols.map((v) => [v.code, v.vol]));
-  const funds = rows.map((r) => {
-    const v = vol.get(r.code) ?? null;
-    return { ...r, ...classify(r.name, r.kind), vol: v, risk: riskOf(v) };
-  });
+  );
+  const funds = rows.map((r) => ({ ...r, ...classify(r.name, r.kind), risk: riskOf(r.vol) }));
   return { ref: rows[0]?.ref ?? "", funds };
+}
+
+// Veri günde bir güncellenir; liste sorgusu ağır (10 join + jsonb) olduğu için tür başına kısa süreli bellek önbelleği.
+const TTL = 5 * 60_000;
+const cache = new Map<string, { t: number; p: Promise<{ ref: string; funds: Fund[] }> }>();
+export function listFunds(kind: string) {
+  const hit = cache.get(kind);
+  if (hit && Date.now() - hit.t < TTL) return hit.p;
+  const p = queryFunds(kind);
+  cache.set(kind, { t: Date.now(), p });
+  p.catch(() => cache.delete(kind)); // hatayı önbellekleme
+  return p;
 }
 
 export type Detail = {
