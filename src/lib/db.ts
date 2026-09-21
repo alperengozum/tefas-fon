@@ -44,12 +44,20 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
   return { ref: rows[0]?.ref ?? "", funds };
 }
 
-// Veri günde bir güncellenir; liste sorgusu ağır (10 join + jsonb) olduğu için tür başına kısa süreli bellek önbelleği.
-const TTL = 5 * 60_000;
-const cache = new Map<string, { t: number; p: Promise<{ ref: string; funds: Fund[] }> }>();
-export function listFunds(kind: string) {
+// Veri günde bir güncellenir; liste sorgusu ağır (10 join + jsonb). Tür başına bellek önbelleği, süresi dolunca eski sonuç
+// hemen döner ve arkada yenilenir (stale-while-revalidate): kullanıcı sorguyu asla beklemez (ilk yükleme hariç).
+const TTL = 10 * 60_000;
+type Listed = { ref: string; funds: Fund[] };
+const cache = new Map<string, { t: number; p: Promise<Listed>; refreshing?: boolean }>();
+export function listFunds(kind: string): Promise<Listed> {
   const hit = cache.get(kind);
-  if (hit && Date.now() - hit.t < TTL) return hit.p;
+  if (hit) {
+    if (Date.now() - hit.t > TTL && !hit.refreshing) {
+      hit.refreshing = true;
+      queryFunds(kind).then((v) => cache.set(kind, { t: Date.now(), p: Promise.resolve(v) })).catch(() => (hit.refreshing = false));
+    }
+    return hit.p;
+  }
   const p = queryFunds(kind);
   cache.set(kind, { t: Date.now(), p });
   p.catch(() => cache.delete(kind)); // hatayı önbellekleme
