@@ -26,8 +26,16 @@ Hisse portföyü: `npm run holdings` — KAP'ın haftalık/aylık "Portföy Dağ
 - `/fon/KOD` — detay: getiri, nakit akışı, fiyat/büyüklük/yatırımcı grafiği, varlık dağılımı, rakip fonlar
 - `/karsilastir?codes=A,B,...` — en fazla 10 fon: 100'e endeksli grafik, metrikler, varlık dağılımı
 
+- `/fon/KOD` ayrıca: endekslere karşı getiri tablosu + grafik (BIST 100, USD/TRY, gram altın), BIST100 betası/korelasyonu, kayan 3 aylık getiri dağılımı, hisse portföyü en çok örtüşen fonlar
+- `/karsilastir` ayrıca: fonlar arası getiri korelasyonu ve hisse örtüşmesi (Σ min ağırlık) matrisi, `endeks=1` ile endeks çizgileri
+- `/hisse/TICKER` — hisseyi tutan tüm fonlar, ağırlık ve tahmini TL pozisyon
+- `/portfoy?p=AFT:5000,TCD:3000` — birleşik varlık dağılımı, hisse maruziyeti, geriye dönük performans, korelasyon/örtüşme (tarayıcıda localStorage'a kaydedilir)
+- `/simulasyon?codes=AFT&monthly=5000&start=2025-09-21` — aylık düzenli alım (SIP, XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı
+
+Endeks verisi Yahoo Finance'ten (`bench` tablosu, `node scripts/ingest.mjs bench`, günlük ingest sonunda otomatik). TEFAS'ta D tarihli fon fiyatı önceki işlem gününü yansıttığı için endeks tarihleri okunurken bir işlem günü kaydırılır (`getBench`). Saf hesaplar `src/lib/stats.ts`, testi `npm test`.
+
 ## Sınırlar (TEFAS API'sinde olmayan veriler)
-Yönetim ücreti, stopaj, KAP akışı, BIST/dolar/altın benchmark yok.
+Yönetim ücreti, stopaj, KAP akışı yok.
 Hisse portföyü KAP PDR'lerinden gelir; verinin hiç olmadığı gruplar: BES fonları (KAP'ta rapor yok), nitelikli yatırımcı (özel) fonları (rapordan muaf), yazısı vektör çizili PDF yayımlayanlar (İş, Nurol, EMAA Blue, kısmen Osmanlı — OCR güvenilmez). Kalanların ~%75'i okunur; ağırlık sütunu PDF'in kendi grup toplamıyla doğrulanır, olmazsa TEFAS hisse %'sine bakılır. `npm test` ayrıştırıcıyı gerçek PDF'lerle sınar.
 Nakit akışı = pay sayısı değişimi × güncel fiyat (yaklaşık). Kategori = en büyük varlık kalemi. Varlık dağılımı sadece son gün.
 

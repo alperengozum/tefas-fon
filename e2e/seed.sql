@@ -20,3 +20,7 @@ INSERT INTO alloc SELECT code, current_date, alloc FROM f;
 INSERT INTO holdings VALUES ('BBB','EREGL',6.5), ('BBB','THYAO',8.2), ('EEE','EREGL',3.1), ('EEE','ASELS',2.4);
 INSERT INTO holdings_meta (code, disclosure_index, report, published) VALUES
   ('BBB', 1, '2026/08', current_date), ('EEE', 2, '2026/08', current_date);
+
+-- benchmark serileri (BIST100, USD, ALTIN), 401 gün
+INSERT INTO bench SELECT s, current_date - d, base * (1 + 0.001 * (400 - d) + 0.01 * sin(d))
+FROM (VALUES ('BIST100', 10000.0), ('USD', 30.0), ('ALTIN', 3000.0)) v(s, base), generate_series(0, 400) d;

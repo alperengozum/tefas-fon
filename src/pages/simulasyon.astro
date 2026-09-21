@@ -1,0 +1,61 @@
+---
+import Base from "../layouts/Base.astro";
+import { getBench, getFunds } from "../lib/db";
+import { BENCH } from "../lib/analytics";
+import { simulate } from "../lib/stats";
+import { pct, tl, tone } from "../lib/format";
+
+const q = Astro.url.searchParams;
+const codes = [...new Set((q.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 6);
+const monthly = Math.min(Math.max(Number(q.get("monthly")) || 5000, 1), 1e9);
+const today = new Date().toISOString().slice(0, 10);
+const isDate = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)) ? s : null);
+const start = isDate(q.get("start")) ?? new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+const end = isDate(q.get("end")) ?? today;
+
+const [{ funds }, bench] = await Promise.all([getFunds(codes), getBench()]);
+const rows = [
+  ...funds.map((f) => ({ code: f.code, name: f.name, sim: simulate(f.history, monthly, start, end) })),
+  ...BENCH.filter(([k]) => bench[k]).map(([k, l]) => ({ code: null, name: l, sim: simulate(bench[k], monthly, start, end) })),
+];
+const missing = codes.filter((c) => !funds.some((f) => f.code === c));
+---
+<Base title="Simülasyon · TEFAS Fon Analiz">
+  <h1 class="mb-1 text-xl font-semibold">Yatırım simülasyonu</h1>
+  <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; vergi ve fon masrafı ayrıca hesaba katılmaz (fiyata zaten yansır).</p>
+  <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
+    <label class="flex flex-col gap-1">Fon kodları<input name="codes" value={codes.join(",")} placeholder="AFT,TCD" class="h-8 w-56 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Aylık tutar (₺)<input name="monthly" type="number" min="1" value={monthly} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Başlangıç<input name="start" type="date" value={start} class="h-8 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Bitiş<input name="end" type="date" value={end} class="h-8 rounded-lg border bg-transparent px-2" /></label>
+    <button class="h-8 rounded-lg bg-primary px-3 text-primary-foreground">Hesapla</button>
+  </form>
+  {missing.length > 0 && <p class="mb-3 text-sm text-red-600">Bulunamadı: {missing.join(", ")}</p>}
+  <div class="overflow-x-auto rounded-lg border">
+    <table class="w-full text-sm tabular-nums">
+      <thead class="bg-muted/50 text-right">
+        <tr><th class="p-2 text-left" rowspan="2">Varlık</th><th class="p-2 text-center" colspan="5">Aylık düzenli alım</th><th class="p-2 text-center" colspan="2">Başta tek seferlik</th></tr>
+        <tr><th class="p-2">Alım</th><th class="p-2">Yatırılan</th><th class="p-2">Değer</th><th class="p-2">Getiri</th><th class="p-2">Yıllık (XIRR)</th><th class="p-2">Getiri</th><th class="p-2">Yıllık</th></tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr class="border-t">
+            <td class="p-2">{r.code ? <a class="hover:underline" href={`/fon/${r.code}`}><b>{r.code}</b> <span class="text-muted-foreground">{r.name}</span></a> : <span class="text-muted-foreground">{r.name}</span>}</td>
+            {r.sim ? (
+              <>
+                <td class="p-2 text-right" title={`${r.sim.first} → ${r.sim.last}`}>{r.sim.n}</td>
+                <td class="p-2 text-right">{tl(r.sim.invested)}</td>
+                <td class="p-2 text-right">{tl(r.sim.value)}</td>
+                <td class={`p-2 text-right ${tone(r.sim.ret)}`}>{pct(r.sim.ret)}</td>
+                <td class={`p-2 text-right ${tone(r.sim.xirr)}`}>{r.sim.xirr == null ? "–" : pct(r.sim.xirr * 100)}</td>
+                <td class={`p-2 text-right ${tone(r.sim.lump)}`}>{pct(r.sim.lump)}</td>
+                <td class={`p-2 text-right ${tone(r.sim.lumpAnn)}`}>{pct(r.sim.lumpAnn)}</td>
+              </>
+            ) : <td class="p-2 text-muted-foreground" colspan="7">Bu aralıkta yeterli veri yok</td>}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3 text-xs text-muted-foreground">Her ay başlangıç günü aynı gün (yoksa sonraki işlem günü) alım yapılır; bitiş fiyatıyla değerlenir. Fon geçmişi ingest edilen kadardır (yaklaşık son 13 ay, günde bir uzar); daha eski başlangıçlarda "veri yok" çıkabilir. Yıllık oran 90 günden kısa sürede gösterilmez. Endeksler: BIST 100 (puan), USD/TRY, gram altın (Yahoo Finance).</p>
+</Base>

@@ -190,6 +190,53 @@ test("sonsuz kaydırma: alta inince satırlar 100'den artar", async ({ page }) =
   await expect.poll(() => rows(page).count()).toBeGreaterThan(200);
 });
 
+// --- endeks, korelasyon/örtüşme, hisse sayfası, portföy, simülasyon ---
+// DB'de birden çok fonun tuttuğu bir hisse (EREGL) kullanılır; yoksa atlanır
+const holders = async (request) => Object.keys(await (await request.get("/api/holdings?ticker=EREGL")).json());
+
+test("fon detay: endekslere karşı tablo ve grafik", async ({ page }) => {
+  await ready(page);
+  await page.goto(`/fon/${await codeAt(page)}`);
+  await expect(page.getByRole("heading", { name: /Endekslere karşı/ })).toBeVisible();
+  for (const t of ["BIST 100", "USD/TRY", "Gram altın"]) await expect(page.getByRole("cell", { name: t })).toBeVisible();
+});
+
+test("hisse sayfası: hisseyi tutan fonlar; bilinmeyen hisse 404", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto("/hisse/EREGL");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("EREGL");
+  await expect(page.locator(`a[href="/fon/${codes[0]}"]`)).toBeVisible();
+  expect((await request.get("/hisse/ZZZZ9")).status()).toBe(404);
+});
+
+test("karşılaştır: korelasyon + hisse örtüşmesi matrisi, endeks çizgileri", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto(`/karsilastir?codes=${codes[0]},${codes[1]}&endeks=1`);
+  await expect(page.getByRole("heading", { name: /Getiri korelasyonu/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Hisse örtüşmesi/ })).toBeVisible();
+  await expect(page.locator(".recharts-legend-item-text", { hasText: "BIST100" })).toBeVisible();
+});
+
+test("simülasyon: fon ve endeksler için SIP/tek seferlik sonuç", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 1, "DB'de EREGL portföy verisi yok");
+  await page.goto(`/simulasyon?codes=${codes[0]}&monthly=1000`);
+  await expect(page.locator("tbody tr").first()).toContainText(codes[0]);
+  await expect(page.locator("tbody tr", { hasText: "BIST 100" })).toContainText("%");
+});
+
+test("portföy: birleşik analiz, tarayıcıda hatırlanır", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto(`/portfoy?p=${codes[0]}:1000,${codes[1]}:2000`);
+  await expect(page.getByRole("heading", { name: "Birleşik varlık dağılımı" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Getiri korelasyonu/ })).toBeVisible();
+  await page.goto("/portfoy"); // p yok -> localStorage'dan geri yüklenir
+  await expect(page).toHaveURL(new RegExp(`p=${codes[0]}`));
+});
+
 test("favoriler: listede yıldızla ekle, /favoriler'de görün, detayda çıkar", async ({ page }) => {
   await ready(page);
   const code = await codeAt(page);

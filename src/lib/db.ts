@@ -159,3 +159,30 @@ export const getFunds = cached(async (codes: string[]): Promise<{ funds: Detail[
   });
   return { funds, holdings };
 }, (codes) => codes.join(","));
+
+// Benchmark serileri (BIST100, USD, ALTIN), fon geçmişiyle aynı {date, price} biçiminde. Tablo boşsa {}.
+// TEFAS'ta D tarihli fon fiyatı bir önceki işlem gününün kapanışını yansıtır (AKU/BIST100 korelasyonu: gecikme 0'da 0.00,
+// -1'de 0.98), bu yüzden her endeks kapanışı bir sonraki işlem gününün tarihiyle etiketlenir; en son kapanış (henüz fon karşılığı yok) atılır.
+export const getBench = cached(async (): Promise<Record<string, { date: string; price: number }[]>> => {
+  const { rows } = await pool.query(`SELECT sym, date::text, price FROM bench ORDER BY sym, date`);
+  const raw: Record<string, { date: string; price: number }[]> = {};
+  for (const r of rows) (raw[r.sym] ??= []).push({ date: r.date, price: r.price });
+  return Object.fromEntries(Object.entries(raw).map(([s, h]) => [s, h.slice(0, -1).map((r, i) => ({ date: h[i + 1].date, price: r.price }))]));
+}, () => "b");
+
+// `code` fonuyla ortak hisse ağırlığı (Σ min) en yüksek fonlar
+export const overlapping = cached(async (code: string, n = 8): Promise<{ code: string; name: string; ov: number }[]> => (await pool.query(
+  `WITH o AS (
+     SELECT b.code, sum(least(a.weight, b.weight)) AS ov FROM holdings a JOIN holdings b ON b.ticker = a.ticker AND b.code <> a.code
+     WHERE a.code = $1 GROUP BY b.code ORDER BY ov DESC LIMIT $2)
+   SELECT o.code, i.name, o.ov FROM o JOIN LATERAL (SELECT name FROM info WHERE code = o.code ORDER BY date DESC LIMIT 1) i ON true ORDER BY o.ov DESC`,
+  [code, n],
+)).rows, (code, n) => `${code}|${n}`);
+
+// Bir hisseyi tutan tüm fonlar: ağırlık, fon büyüklüğü ve tahmini pozisyon (ağırlık x büyüklük)
+export const tickerFunds = cached(async (ticker: string): Promise<{ code: string; name: string; kind: string; weight: number; size: number | null; amount: number | null }[]> => (await pool.query(
+  `SELECT h.code, i.name, i.kind, h.weight, i.size, h.weight / 100 * i.size AS amount FROM holdings h
+   JOIN LATERAL (SELECT name, kind, size FROM info WHERE code = h.code ORDER BY date DESC LIMIT 1) i ON true
+   WHERE h.ticker = $1 ORDER BY amount DESC NULLS LAST`,
+  [ticker],
+)).rows, (t) => t);

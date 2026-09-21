@@ -8,7 +8,7 @@
     "ingest": "node scripts/ingest.mjs",
     "db:init": "psql \"${DATABASE_URL:-postgres://tefas:tefas@localhost/tefas}\" -f db/schema.sql",
     "holdings": "node scripts/holdings.mjs",
-    "test": "node --test test/parse.test.mjs",
+    "test": "node --experimental-strip-types --no-warnings --test test/*.test.mjs",
     "test:e2e": "playwright test"
   },
   "keywords": [],
