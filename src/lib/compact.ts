@@ -4,7 +4,7 @@ import type { Fund } from "./db";
 // Burada satırlar dizi, tekrar eden metinler (tür/kurucu/kategori) sözlük, bayraklar bit maskesi, sayılar yuvarlanmış: ~%85 küçük.
 const RET = ["d1", "w1", "m1", "m3", "m6", "ytd", "y1", "y2", "y3", "y5"] as const;
 const FLOW = ["flow_w1", "flow_m1", "flow_m3"] as const;
-const FLAGS = ["fx", "islamic", "qualified", "stockFocus", "oks"] as const;
+const FLAGS = ["fx", "islamic", "qualified", "stockFocus", "oks", "active"] as const;
 const r2 = (v: number | null) => (v == null || !isFinite(v) ? null : Math.round(v * 100) / 100);
 
 export type FundRow = Fund & { hay: string }; // hay: arama için önceden küçültülmüş "kod ad"
