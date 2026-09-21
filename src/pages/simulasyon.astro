@@ -1,12 +1,13 @@
 ---
 import Base from "../layouts/Base.astro";
+import FundPicker from "../components/FundCombobox";
 import { getBench, getFunds } from "../lib/db";
 import { BENCH } from "../lib/analytics";
 import { simulate } from "../lib/stats";
 import { pct, tl, tone } from "../lib/format";
 
 const q = Astro.url.searchParams;
-const codes = [...new Set((q.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 6);
+const codes = [...new Set(q.getAll("codes").flatMap((s) => s.toUpperCase().split(",")).map((c) => c.trim()).filter(Boolean))].slice(0, 6);
 const monthly = Math.min(Math.max(Number(q.get("monthly")) || 5000, 1), 1e9);
 const today = new Date().toISOString().slice(0, 10);
 const isDate = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)) ? s : null);
@@ -24,7 +25,7 @@ const missing = codes.filter((c) => !funds.some((f) => f.code === c));
   <h1 class="mb-1 text-xl font-semibold">Yatırım simülasyonu</h1>
   <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; vergi ve fon masrafı ayrıca hesaba katılmaz (fiyata zaten yansır).</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
-    <label class="flex flex-col gap-1">Fon kodları<input name="codes" value={codes.join(",")} placeholder="AFT,TCD" class="h-8 w-56 rounded-lg border bg-transparent px-2" /></label>
+    <div class="flex flex-col gap-1">Fonlar <span class="text-xs text-muted-foreground">en fazla 6, endeksler her zaman eklenir</span><FundPicker client:only="react" name="codes" initial={codes} max={6} /></div>
     <label class="flex flex-col gap-1">Aylık tutar (₺)<input name="monthly" type="number" min="1" value={monthly} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
     <label class="flex flex-col gap-1">Başlangıç<input name="start" type="date" value={start} class="h-8 rounded-lg border bg-transparent px-2" /></label>
     <label class="flex flex-col gap-1">Bitiş<input name="end" type="date" value={end} class="h-8 rounded-lg border bg-transparent px-2" /></label>

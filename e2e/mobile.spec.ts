@@ -74,9 +74,13 @@ test("mobil: karşılaştırma formu ve tablosu taşmaz", async ({ page }) => {
   const [a, b] = [await codeAt(page, 0), await codeAt(page, 1)];
   await page.goto("/karsilastir");
   await noPageScroll(page);
-  const input = (await page.getByPlaceholder(/Fon kodları/).boundingBox())!;
+  const input = (await page.getByRole("combobox", { name: "Fon ekle" }).boundingBox())!;
   expect(input.x + input.width).toBeLessThanOrEqual(375);
-  await page.getByPlaceholder(/Fon kodları/).fill(`${a},${b}`);
+  for (const c of [a, b]) {
+    await page.getByRole("combobox", { name: "Fon ekle" }).fill(c);
+    await page.getByRole("option").first().tap();
+  }
+  await noPageScroll(page);
   await page.getByRole("button", { name: "Karşılaştır" }).tap();
   await expect(page.locator("thead")).toContainText(a);
   await expect(page.locator(".recharts-wrapper").first()).toBeVisible();

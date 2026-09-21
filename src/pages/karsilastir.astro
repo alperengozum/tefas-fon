@@ -2,12 +2,14 @@
 import Base from "../layouts/Base.astro";
 import CompareChart from "../components/CompareChart";
 import Matrix from "../components/Matrix.astro";
+import FundPicker from "../components/FundCombobox";
 import { getBench, getFunds } from "../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../lib/analytics";
 import { corr, dailyReturns, overlap } from "../lib/stats";
 import { label, pct, tl, tone } from "../lib/format";
 
-const codes = [...new Set((Astro.url.searchParams.get("codes") ?? "").toUpperCase().split(",").map((c) => c.trim()).filter(Boolean))].slice(0, 10);
+// ?codes=A&codes=B (form) ya da eski ?codes=A,B (fon listesinden gelen bağlantılar)
+const codes = [...new Set(Astro.url.searchParams.getAll("codes").flatMap((s) => s.toUpperCase().split(",")).map((c) => c.trim()).filter(Boolean))].slice(0, 10);
 const endeks = Astro.url.searchParams.get("endeks") === "1";
 const [{ funds, holdings }, bench] = await Promise.all([getFunds(codes), endeks ? getBench() : Promise.resolve({} as Awaited<ReturnType<typeof getBench>>)]);
 // son 1 yıl günlük getiri korelasyonu; hisse örtüşmesi: ikisinin de listesi olan fon çiftleri
@@ -25,13 +27,12 @@ const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
 ---
 <Base title="Fon Karşılaştırma · TEFAS Fon Analiz">
   <h1 class="mb-4 text-xl font-semibold">Fon Karşılaştırma</h1>
-  <form class="mb-6 flex flex-wrap gap-2" method="get">
-    <input name="codes" value={codes.join(",")} placeholder="Fon kodları, virgülle (ör. AFT,TCD,MAC)" class="h-8 w-full rounded-lg sm:w-96 border bg-transparent px-2 text-sm" />
+  <form class="mb-6 flex flex-wrap items-start gap-3" method="get">
+    <FundPicker client:only="react" name="codes" initial={codes} max={10} />
     <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Karşılaştır</button>
     <label class="flex items-center gap-1 self-center text-sm"><input type="checkbox" name="endeks" value="1" checked={endeks} /> BIST100 / USD / altın ekle</label>
-    <span class="self-center text-xs text-muted-foreground">en fazla 10 fon</span>
   </form>
-  {funds.length === 0 ? <p class="text-muted-foreground">Fon listesinden kutucukları işaretleyin ya da kod girin.</p> : (
+  {funds.length === 0 ? <p class="text-muted-foreground">Fon listesinden kutucukları işaretleyin ya da yukarıdan fon seçin.</p> : (
     <>
       <section class="mb-8"><CompareChart client:only="react" series={[...funds.map((f) => ({ code: f.code, name: f.name, history: forChart(f.history, ["price"]) })), ...BENCH.filter(([k]) => bench[k]).map(([k, l]) => ({ code: k, name: l, history: forChart(bench[k], ["price"]) }))]} /></section>
       {funds.length > 1 && (
