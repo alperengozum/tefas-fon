@@ -4,3 +4,5 @@ dist
 *.log
 out.html
 yat.html
+test-results
+playwright-report
