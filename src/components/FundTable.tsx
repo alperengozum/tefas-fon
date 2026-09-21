@@ -42,7 +42,17 @@ function Pick({ value, onChange, all, items, className }: { value: string; onCha
   );
 }
 
-export default function FundTable({ data }: { data: string }) {
+// Liste verisi sayfaya gömülmez, ayrı (önbelleklenebilir) JSON'dan gelir; sayfa kabuğu <link rel=preload> ile erken başlatır.
+export default function FundTable({ src }: { src: string }) {
+  const [data, setData] = useState<string | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => { fetch(src).then((r) => (r.ok ? r.text() : Promise.reject())).then(setData).catch(() => setErr(true)); }, [src]);
+  if (err) return <p className="text-muted-foreground">Liste yüklenemedi; sayfayı yenileyin.</p>;
+  if (data == null) return <p className="text-muted-foreground">Yükleniyor…</p>;
+  return <FundTableView data={data} />;
+}
+
+function FundTableView({ data }: { data: string }) {
   const funds = useMemo(() => decodeFunds(data), [data]);
   const [view, setView] = useState("getiri");
   const [f, setF] = useState(EMPTY);
