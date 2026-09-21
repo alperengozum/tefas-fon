@@ -1,5 +1,5 @@
 import pg from "pg";
-import { classify, riskOf } from "./classify";
+import { classify, fold, riskOf } from "./classify";
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas",
@@ -47,6 +47,11 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
     [kind],
   );
   const funds = rows.map((r) => ({ ...r, ...classify(r.name, r.kind), risk: riskOf(r.vol) }));
+  // Aynı kurucu İ/I farkıyla ayrı yazılmış olabilir (AZİMUT/AZIMUT): katlanmış anahtara göre en sık yazımı kullan.
+  const count = new Map<string, number>(), best = new Map<string, string>();
+  for (const { founder: n } of funds) count.set(n, (count.get(n) ?? 0) + 1);
+  for (const [n, c] of count) { const k = fold(n), b = best.get(k); if (!b || c > count.get(b)!) best.set(k, n); }
+  for (const f of funds) f.founder = best.get(fold(f.founder))!;
   return { ref: rows[0]?.ref ?? "", funds };
 }
 
