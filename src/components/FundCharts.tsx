@@ -29,7 +29,7 @@ export default function FundCharts({ history }: { history: H }) {
             <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} />
             <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={70} />
             <Tooltip formatter={(v: number) => fmt(v)} />
-            <Area type="monotone" dataKey={metric} stroke="var(--color-chart-1, #2563eb)" fill="var(--color-chart-1, #2563eb)" fillOpacity={0.15} dot={false} isAnimationActive={false} />
+            <Area type="monotone" dataKey={metric} name={METRICS[metric][0]} stroke="var(--color-chart-1, #2563eb)" fill="var(--color-chart-1, #2563eb)" fillOpacity={0.15} dot={false} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
