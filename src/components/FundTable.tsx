@@ -178,7 +178,12 @@ export default function FundTable({ funds }: { funds: Fund[] }) {
           </TableHeader>
           <TableBody>
             {rows.slice(0, limit).map((x) => (
-              <TableRow key={x.code}>
+              <TableRow key={x.code} className="cursor-pointer"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("input,a")) return; // onay kutusu ve kod bağlantısı kendi işini yapar
+                  if (e.metaKey || e.ctrlKey) window.open(`/fon/${x.code}`, "_blank");
+                  else location.href = `/fon/${x.code}`;
+                }}>
                 <TableCell>
                   <input type="checkbox" checked={picked.includes(x.code)} disabled={!picked.includes(x.code) && picked.length >= MAX_COMPARE}
                     onChange={(e) => setPicked(e.target.checked ? [...picked, x.code] : picked.filter((c) => c !== x.code))} />
