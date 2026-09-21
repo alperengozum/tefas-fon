@@ -2,7 +2,7 @@ import { useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "./ui/button";
 
-type Series = { code: string; history: { date: string; price: number }[] };
+type Series = { code: string; name: string; history: { date: string; price: number }[] };
 const RANGES: [string, number][] = [["1A", 30], ["3A", 91], ["6A", 182], ["1Y", 365]];
 const COLORS = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#ea580c", "#475569"];
 
@@ -17,6 +17,7 @@ export default function CompareChart({ series }: { series: Series[] }) {
     if (!base) continue;
     for (const r of h) byDate.set(r.date, { ...byDate.get(r.date), [s.code]: (r.price / base) * 100 });
   }
+  const names = new Map(series.map((s) => [s.code, s.name]));
   const data = [...byDate].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, v]) => ({ date, ...v }));
   return (
     <div className="space-y-3">
@@ -30,7 +31,7 @@ export default function CompareChart({ series }: { series: Series[] }) {
             <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} />
             <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} width={50} />
             <Tooltip formatter={(v: number) => v.toFixed(2)} />
-            <Legend />
+            <Legend formatter={(v: string) => <span title={names.get(v)}>{v}</span>} />
             {series.map((s, i) => <Line key={s.code} dataKey={s.code} stroke={COLORS[i % COLORS.length]} dot={false} connectNulls strokeWidth={1.8} isAnimationActive={false} />)}
           </LineChart>
         </ResponsiveContainer>

@@ -70,6 +70,21 @@ export function listFunds(kind: string): Promise<Listed> {
   return p;
 }
 
+// Genel amaçlı TTL önbelleği (anahtar başına Promise; hata önbelleklenmez, en fazla 500 kayıt, en eski önce atılır).
+// ponytail: süreç içi Map, tek konteyner; birden çok örnek olursa Redis. Veri günde bir değiştiği için 10 dk bayatlık kabul.
+function cached<A extends unknown[], T>(fn: (...a: A) => Promise<T>, key: (...a: A) => string) {
+  const m = new Map<string, { t: number; p: Promise<T> }>();
+  return (...a: A): Promise<T> => {
+    const k = key(...a), hit = m.get(k);
+    if (hit && Date.now() - hit.t < TTL) return hit.p;
+    const p = fn(...a);
+    m.set(k, { t: Date.now(), p });
+    p.catch(() => m.delete(k));
+    if (m.size > 500) m.delete(m.keys().next().value!);
+    return p;
+  };
+}
+
 export type Detail = {
   code: string; name: string; kind: string;
   history: { date: string; price: number; size: number; investors: number; shares: number }[];
@@ -77,7 +92,7 @@ export type Detail = {
   active?: boolean; // sadece getFund doldurur
 };
 
-export async function getFund(code: string): Promise<Detail | null> {
+export const getFund = cached(async (code: string): Promise<Detail | null> => {
   const [h, a, ref] = await Promise.all([
     pool.query(`SELECT kind, name, date::text, price, size, investors, shares FROM info WHERE code=$1 ORDER BY date`, [code]),
     pool.query(`SELECT date::text, data FROM alloc WHERE code=$1`, [code]),
@@ -86,15 +101,18 @@ export async function getFund(code: string): Promise<Detail | null> {
   if (!h.rows.length) return null;
   const last = h.rows[h.rows.length - 1];
   return { code, name: last.name, kind: last.kind, history: h.rows, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, active: last.date >= ref.rows[0].min };
-}
+}, (code) => code);
 
 // Rakip analizi: aynı türde, varlık dağılımı en yakın fonlar (öklid mesafesi)
+// Ağır kısım (türün tüm dağılım satırları) tür başına önbelleklenir; mesafe hesabı istek başına ucuz.
+const allocOf = cached(async (kind: string) => (await pool.query(
+  `SELECT a.code, i.name, a.data FROM alloc a
+   JOIN info i ON i.code = a.code AND i.date = a.date WHERE i.kind = $1`,
+  [kind],
+)).rows, (kind) => kind);
+
 export async function peers(code: string, kind: string, n = 8) {
-  const { rows } = await pool.query(
-    `SELECT a.code, i.name, a.data FROM alloc a
-     JOIN info i ON i.code = a.code AND i.date = a.date WHERE i.kind = $1`,
-    [kind],
-  );
+  const rows = await allocOf(kind);
   const me = rows.find((r) => r.code === code);
   if (!me) return [];
   const dist = (x: Record<string, number>, y: Record<string, number>) => {
@@ -109,22 +127,22 @@ export async function peers(code: string, kind: string, n = 8) {
 
 export type Holding = { ticker: string; weight: number };
 
-export async function getHoldings(code: string): Promise<{ holdings: Holding[]; report: string | null; published: string | null; note: string | null; seen: boolean }> {
+export const getHoldings = cached(async (code: string): Promise<{ holdings: Holding[]; report: string | null; published: string | null; note: string | null; seen: boolean }> => {
   const [h, m] = await Promise.all([
     pool.query(`SELECT ticker, weight FROM holdings WHERE code=$1 ORDER BY weight DESC`, [code]),
     pool.query(`SELECT report, published::text, note FROM holdings_meta WHERE code=$1`, [code]),
   ]);
   return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: m.rowCount > 0 };
-}
+}, (code) => code);
 
 // Hisse filtresi: `ticker`ı en az `min` % ağırlıkla tutan fonlar -> {kod: ağırlık}
-export async function fundsHolding(ticker: string, min: number): Promise<Record<string, number>> {
+export const fundsHolding = cached(async (ticker: string, min: number): Promise<Record<string, number>> => {
   const { rows } = await pool.query(`SELECT code, weight FROM holdings WHERE ticker=$1 AND weight >= $2`, [ticker, min]);
   return Object.fromEntries(rows.map((r) => [r.code, r.weight]));
-}
+}, (ticker, min) => `${ticker}|${min}`);
 
 // Karşılaştırma için toplu okuma: fon başına ayrı sorgu yerine 3 sorgu (geçmiş, dağılım, hisseler).
-export async function getFunds(codes: string[]): Promise<{ funds: Detail[]; holdings: Map<string, Holding[]> }> {
+export const getFunds = cached(async (codes: string[]): Promise<{ funds: Detail[]; holdings: Map<string, Holding[]> }> => {
   if (!codes.length) return { funds: [], holdings: new Map() };
   const [h, a, hl] = await Promise.all([
     pool.query(`SELECT code, kind, name, date::text, price, size, investors, shares FROM info WHERE code = ANY($1) ORDER BY code, date`, [codes]),
@@ -140,4 +158,4 @@ export async function getFunds(codes: string[]): Promise<{ funds: Detail[]; hold
     return { code, name: last.name, kind: last.kind, history: rows, alloc: alloc.get(code)?.data ?? {}, allocDate: alloc.get(code)?.date ?? null } as Detail;
   });
   return { funds, holdings };
-}
+}, (codes) => codes.join(","));
