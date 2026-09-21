@@ -110,7 +110,7 @@ export default function FundTable({ data }: { data: string }) {
       {head}{sort.key === key ? (sort.dir === -1 ? " ↓" : " ↑") : ""}
     </TableHead>
   );
-  const num = (k: keyof typeof EMPTY, ph: string, w = "w-28") => (
+  const num = (k: keyof typeof EMPTY, ph: string, w = "min-w-0 flex-1 sm:w-28 sm:flex-none") => (
     <Input className={w} type="number" placeholder={ph} value={f[k] as string} onChange={(e) => set({ [k]: e.target.value })} />
   );
   const riskItems = [1, 2, 3, 4, 5, 6, 7].map((r) => ({ value: String(r), label: String(r) }));
@@ -120,12 +120,12 @@ export default function FundTable({ data }: { data: string }) {
     <div className="space-y-4">
       {/* hızlı filtreler */}
       <div className="flex flex-wrap items-center gap-2">
-        <Input className="w-56" placeholder="Fon kodu veya adı…" value={f.q} onChange={(e) => set({ q: e.target.value })} />
-        <Pick className="w-44" value={f.type} onChange={(v) => set({ type: v })} all="Tüm fon türleri" items={opts.types.map((t) => ({ value: t, label: t }))} />
-        <Pick className="w-56" value={f.founder} onChange={(v) => set({ founder: v })} all="Tüm kurucular (PYŞ)" items={opts.founders.map((t) => ({ value: t, label: t }))} />
-        <div className="flex items-center gap-1">
-          <Input className="w-36 uppercase" placeholder="Hisse (EREGL)" value={f.stock} onChange={(e) => set({ stock: e.target.value })} />
-          <Input className="w-24" type="number" placeholder="≥ % ağırlık" value={f.stockW} onChange={(e) => set({ stockW: e.target.value })} />
+        <Input className="w-full sm:w-56" placeholder="Fon kodu veya adı…" value={f.q} onChange={(e) => set({ q: e.target.value })} />
+        <Pick className="w-full sm:w-44" value={f.type} onChange={(v) => set({ type: v })} all="Tüm fon türleri" items={opts.types.map((t) => ({ value: t, label: t }))} />
+        <Pick className="w-full sm:w-56" value={f.founder} onChange={(v) => set({ founder: v })} all="Tüm kurucular (PYŞ)" items={opts.founders.map((t) => ({ value: t, label: t }))} />
+        <div className="flex w-full items-center gap-1 sm:w-auto">
+          <Input className="min-w-0 flex-1 uppercase sm:w-36 sm:flex-none" placeholder="Hisse (EREGL)" value={f.stock} onChange={(e) => set({ stock: e.target.value })} />
+          <Input className="min-w-0 flex-1 sm:w-24 sm:flex-none" type="number" placeholder="≥ % ağırlık" value={f.stockW} onChange={(e) => set({ stockW: e.target.value })} />
         </div>
         {opts.flags.map((fl) => (
           <Button key={fl.key} size="sm" variant={f.flags.includes(fl.key) ? "default" : "outline"}
@@ -159,7 +159,7 @@ export default function FundTable({ data }: { data: string }) {
         </p>
       </details>
 
-      <Tabs value={view} onValueChange={(v) => setView(v as string)}>
+      <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
         <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
       </Tabs>
 

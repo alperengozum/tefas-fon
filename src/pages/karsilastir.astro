@@ -15,8 +15,8 @@ const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
 ---
 <Base title="Fon Karşılaştırma · TEFAS Fon Analiz">
   <h1 class="mb-4 text-xl font-semibold">Fon Karşılaştırma</h1>
-  <form class="mb-6 flex gap-2" method="get">
-    <input name="codes" value={codes.join(",")} placeholder="Fon kodları, virgülle (ör. AFT,TCD,MAC)" class="h-8 w-96 rounded-lg border bg-transparent px-2 text-sm" />
+  <form class="mb-6 flex flex-wrap gap-2" method="get">
+    <input name="codes" value={codes.join(",")} placeholder="Fon kodları, virgülle (ör. AFT,TCD,MAC)" class="h-8 w-full rounded-lg sm:w-96 border bg-transparent px-2 text-sm" />
     <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Karşılaştır</button>
     <span class="self-center text-xs text-muted-foreground">en fazla 10 fon</span>
   </form>
