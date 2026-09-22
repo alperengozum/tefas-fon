@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { parsePdr } from "../scripts/holdings.mjs";
+import { parsePdr, periodEnd } from "../scripts/holdings.mjs";
 
 const CASES = [ // kod, TEFAS hs, hisse sayısı, en büyük hisse
   ["IJA", 62.4, 19, "TUPRS"], ["ZJB", 120.9, 23, "ZRGYO"], ["KH1", 87.1, 25, "TUPRS"], ["KTS", 81.4, 16, "BIMAS"],
@@ -15,3 +15,12 @@ for (const [code, hs, n, top] of CASES)
     assert.equal(r.length, n);
     assert.equal(r[0].ticker, top);
   });
+
+test("rapor dönemi sonu (ay sonu, ISO hafta pazarı)", () => {
+  assert.equal(periodEnd("8. Ay 2026"), "2026-08-31");
+  assert.equal(periodEnd("2. Ay 2024"), "2024-02-29");
+  assert.equal(periodEnd("36. Hafta 2026"), "2026-09-06");
+  assert.equal(periodEnd("1. Hafta 2021"), "2021-01-10");
+  assert.equal(periodEnd("53. Hafta 2020"), "2021-01-03");
+  assert.equal(periodEnd(null), null);
+});

@@ -4,6 +4,7 @@ import pg from "pg";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { allocData, post } from "./tefas.mjs";
 
 const KAP = "https://www.kap.org.tr/tr/";
 const HDR = { "Content-Type": "application/json", Referer: KAP, "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146.0 Safari/537.36" };
@@ -150,6 +151,41 @@ async function fetchPdf(index) {
   return { buf: Buffer.from(await (await kap(`api/file/download/${att.objId}`)).arrayBuffer()), note: null };
 }
 
+// Rapor dönemi ("8. Ay 2026", "36. Hafta 2026") -> dönemin son takvim günü (ay sonu / ISO hafta pazarı)
+export function periodEnd(rule) {
+  const m = /^(\d+)\. (Ay|Hafta) (\d+)$/.exec(rule ?? "");
+  if (!m) return null;
+  const [n, y] = [Number(m[1]), Number(m[3])];
+  if (m[2] === "Ay") return ymd(new Date(Date.UTC(y, n, 0)));
+  const jan4 = new Date(Date.UTC(y, 0, 4)); // 4 Ocak her zaman 1. haftada
+  return ymd(new Date(jan4.getTime() + ((n - 1) * 7 + 6 - ((jan4.getUTCDay() + 6) % 7)) * 864e5));
+}
+
+// Varlık dağılımını KAP raporunun dönem sonundaki son iş gününden al: hisse ağırlıklarıyla aynı güne ait olsun.
+// (tür, gün) başına tek TEFAS isteği; zaten doğru günü tutan fonlar atlanır.
+async function reportAlloc(db) {
+  const { rows } = await db.query(`SELECT m.code, m.report, m.alloc_date::text, i.kind FROM holdings_meta m
+    JOIN LATERAL (SELECT kind FROM info WHERE code = m.code ORDER BY date DESC LIMIT 1) i ON true WHERE m.report IS NOT NULL`);
+  const groups = new Map();
+  for (const r of rows) {
+    const end = periodEnd(r.report);
+    if (!end) continue;
+    // fonun kendi son fiyat günü (tür geneli değil: birkaç fon hafta sonu da fiyatlanıyor, diğerleri için Pazar boş döner)
+    const { rows: [{ d }] } = await db.query("SELECT max(date)::text d FROM info WHERE code=$1 AND date <= $2", [r.code, end]);
+    if (!d || d === r.alloc_date) continue;
+    const k = `${r.kind} ${d}`;
+    (groups.get(k) ?? groups.set(k, []).get(k)).push(r.code);
+  }
+  for (const [k, codes] of groups) {
+    const [kind, d] = k.split(" ");
+    const got = (await post("dagilimSiraliGetirT", kind, new Date(d), new Date(d))).filter((r) => codes.includes(r.fonKodu));
+    if (got.length)
+      await db.query(`UPDATE holdings_meta m SET alloc = u.data, alloc_date = $3 FROM unnest($1::text[], $2::jsonb[]) u(code, data) WHERE m.code = u.code`,
+        [got.map((r) => r.fonKodu), got.map((r) => JSON.stringify(allocData(r))), d]);
+    console.log("rapor tarihi dağılımı", kind, d, got.length);
+  }
+}
+
 const PARSER_V = 3; // ayrıştırıcı iyileşince artır: eski sürümle işlenen fonlar yeniden okunur
 
 async function main() {
@@ -184,7 +220,7 @@ async function main() {
           if (hs?.length)
             await c.query("INSERT INTO holdings SELECT $1, * FROM unnest($2::text[], $3::float8[])", [x.tefas, hs.map((h) => h.ticker), hs.map((h) => h.weight)]);
           await c.query(
-            "INSERT INTO holdings_meta (code, disclosure_index, report, published, note, v) VALUES ($1,$2,$3,$4::date,$5,$6) ON CONFLICT (code) DO UPDATE SET disclosure_index=$2, report=$3, published=$4::date, note=$5, v=$6",
+            "INSERT INTO holdings_meta (code, disclosure_index, report, published, note, v) VALUES ($1,$2,$3,$4::date,$5,$6) ON CONFLICT (code) DO UPDATE SET disclosure_index=$2, report=$3, published=$4::date, note=$5, v=$6, alloc=NULL, alloc_date=NULL",
             [x.tefas, x.disclosure_index, hs ? x.rule : null, x.published, hs ? null : note ?? "okunamadi", PARSER_V]);
           await c.query("COMMIT");
         } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
@@ -195,6 +231,7 @@ async function main() {
     }
   }));
   console.log(`bitti: ${done - skipped} fon okundu, ${skipped} atlandı (düzen tanınmadı), ${failed} hata`);
+  await reportAlloc(db);
   await db.end();
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

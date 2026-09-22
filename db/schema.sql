@@ -36,3 +36,6 @@ CREATE TABLE IF NOT EXISTS bench (sym text NOT NULL, date date NOT NULL, price d
 -- SPK Kurul Bülteni taraması (kap-bulletin.mjs): SPK'nın kendi kararıyla toplu tasfiyeye çıkardığı fonlar PYŞ'nin
 -- KAP bildirimi olarak hiç yayımlanmıyor, bu yüzden ayrı olarak spk.gov.tr'deki haftalık bültenlerden taranıyor
 CREATE TABLE IF NOT EXISTS spk_bulten_scanned (no text PRIMARY KEY);
+-- KAP raporunun dönem sonundaki (hisse ağırlıklarıyla aynı gün) TEFAS varlık dağılımı; yeni rapor gelince sıfırlanır
+ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc jsonb;
+ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc_date date;
