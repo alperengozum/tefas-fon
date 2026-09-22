@@ -28,7 +28,10 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
     .concat(`SELECT 'ytd', (SELECT max(date) FROM info WHERE date < date_trunc('year', ref.d)) FROM ref`)
     .join(" UNION ALL ");
   const keys = [...Object.keys(PERIODS), "ytd"];
-  const joins = keys.map((k) => `LEFT JOIN info o_${k} ON o_${k}.code = c.code AND o_${k}.date = (SELECT d FROM pd WHERE k='${k}')`).join("\n");
+  // referans: vade günü ve önceki ACTIVE_DAYS içinde fiyatı açıklanmış (≠0) son gün; o gün 0/boşsa getiri "–" kalmasın
+  const joins = keys.map((k) => `LEFT JOIN LATERAL (SELECT price, shares FROM info o WHERE o.code = c.code
+    AND o.date <= (SELECT d FROM pd WHERE k='${k}') AND o.date > (SELECT d FROM pd WHERE k='${k}') - ${ACTIVE_DAYS}
+    AND o.price > 0 ORDER BY o.date DESC LIMIT 1) o_${k} ON true`).join("\n");
   // pasif fonun son fiyatı eski olduğundan güncel vadelerle kıyaslanamaz: getiri/akış boş. Fiyat 0 = açıklanmadı: yine boş
   const rets = keys.map((k) => `CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (NULLIF(c.price, 0) / NULLIF(o_${k}.price, 0) - 1) * 100 END AS ${k}`).join(", ");
   const flows = FLOWS.map((k) => `CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (c.shares - o_${k}.shares) * NULLIF(c.price, 0) END AS flow_${k}`).join(", ");

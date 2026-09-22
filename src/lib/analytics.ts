@@ -6,7 +6,7 @@ export function ret(h: { date: string; price: number }[], days: number | "ytd"):
     ? new Date(new Date(last.date.slice(0, 4) + "-01-01").getTime() - 864e5)
     : new Date(new Date(last.date).getTime() - days * 864e5);
   const c = cut.toISOString().slice(0, 10);
-  const old = [...h].reverse().find((r) => r.date <= c);
+  const old = [...h].reverse().find((r) => r.date <= c && r.price > 0);
   return old?.price && last.price ? (last.price / old.price - 1) * 100 : null;
 }
 
