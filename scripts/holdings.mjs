@@ -130,7 +130,7 @@ async function discover(db, days) {
         `INSERT INTO kap_pdr SELECT * FROM unnest($1::int[], $2::text[], $3::date[], $4::text[], $5::text[]) ON CONFLICT DO NOTHING`,
         [p.map((x) => x.disclosureIndex), p.map((x) => x.fundCode), p.map((x) => x.publishDate.slice(0, 10).split(".").reverse().join("-")),
          p.map((x) => `${x.ruleType} ${x.year ?? ""}`.trim()), p.map((x) => x.kapTitle)]);
-    // aynı günlük listeden tüm bildirim türleri (haberler/detay sayfası için); ekstra KAP isteği yok
+    // aynı günlük listeden tüm bildirim türleri (haberler/detay sayfası + "Fon Tasfiye Duyurusu" aktif/pasif tespitinde kullanılıyor); ekstra KAP isteği yok
     const all = list.filter((x) => x.fundCode);
     if (all.length)
       await db.query(
