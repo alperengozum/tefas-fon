@@ -5,9 +5,11 @@ export function ret(h: { date: string; price: number }[], days: number | "ytd"):
   const cut = days === "ytd"
     ? new Date(new Date(last.date.slice(0, 4) + "-01-01").getTime() - 864e5)
     : new Date(new Date(last.date).getTime() - days * 864e5);
-  const c = cut.toISOString().slice(0, 10);
+  const c = cut.toISOString().slice(0, 10), floor = new Date(cut.getTime() - 7 * 864e5).toISOString().slice(0, 10);
+  // db.ts listesiyle aynı: vade gününden en çok 7 gün geriye bak (ACTIVE_DAYS), yoksa uzak/bozuk bir fiyatla kıyaslanır
   const old = [...h].reverse().find((r) => r.date <= c && r.price > 0);
-  return old?.price && last.price ? (last.price / old.price - 1) * 100 : null;
+  if (!old || old.date <= floor) return null;
+  return last.price ? (last.price / old.price - 1) * 100 : null;
 }
 
 // Grafikler en çok 1 yıl gösterir: istemciye yalnız son ~1 yıl ve gereken alanlar gider

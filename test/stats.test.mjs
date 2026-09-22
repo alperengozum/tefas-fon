@@ -16,6 +16,8 @@ test("fiyat 0 (açıklanmadı) günleri -100% getiri üretmez", () => {
 test("ret: referans gün fiyatı 0 ise önceki açıklanmış fiyat kullanılır", () => {
   const h = series(20, (i) => (i === 12 ? 0 : 100 + i));
   assert.equal(ret(h, 7), (119 / 111 - 1) * 100); // 7 gün önce (i=12) 0 -> i=11
+  const gap = [...series(3, () => 0.01), ...series(5, () => 50, "2025-03-01")]; // FTM: uzun boşluk, önce bozuk fiyat
+  assert.equal(ret(gap, 7), null);
 });
 
 test("korelasyon ve beta: b = 2x getirili seri", () => {
