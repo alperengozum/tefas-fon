@@ -1,13 +1,18 @@
 ---
 import Base from "../../layouts/Base.astro";
+import { allTickers } from "../../lib/db";
 const notFound = Astro.url.searchParams.get("bulunamadi");
+const tickers = await allTickers();
 ---
 <Base title="Hisse Ara · TEFAS Fon Analiz">
   <h1 class="mb-1 text-xl font-semibold">Hisse Ara</h1>
   <p class="mb-4 text-sm text-muted-foreground">Bir hisse kodu girin, o hisseyi hangi fonların ne oranda tuttuğunu görün.</p>
   {notFound && <p class="mb-4 text-sm text-red-600">"{notFound}" hissesini tutan fon bulunamadı.</p>}
   <form id="hisse-form" class="flex flex-wrap gap-2">
-    <input name="t" placeholder="Örn. THYAO" autofocus class="h-8 w-full rounded-lg sm:w-64 border bg-transparent px-2 text-sm uppercase" />
+    <input name="t" list="ticker-list" placeholder="Örn. THYAO" autofocus class="h-8 w-full rounded-lg sm:w-64 border bg-transparent px-2 text-sm uppercase" />
+    <datalist id="ticker-list">
+      {tickers.map((t) => <option value={t} />)}
+    </datalist>
     <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Ara</button>
   </form>
   <script>
