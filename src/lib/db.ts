@@ -29,9 +29,9 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
     .join(" UNION ALL ");
   const keys = [...Object.keys(PERIODS), "ytd"];
   const joins = keys.map((k) => `LEFT JOIN info o_${k} ON o_${k}.code = c.code AND o_${k}.date = (SELECT d FROM pd WHERE k='${k}')`).join("\n");
-  // pasif fonun son fiyatı eski olduğundan güncel vadelerle kıyaslanamaz: getiri/akış boş
-  const rets = keys.map((k) => `CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (c.price / NULLIF(o_${k}.price, 0) - 1) * 100 END AS ${k}`).join(", ");
-  const flows = FLOWS.map((k) => `CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (c.shares - o_${k}.shares) * c.price END AS flow_${k}`).join(", ");
+  // pasif fonun son fiyatı eski olduğundan güncel vadelerle kıyaslanamaz: getiri/akış boş. Fiyat 0 = açıklanmadı: yine boş
+  const rets = keys.map((k) => `CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (NULLIF(c.price, 0) / NULLIF(o_${k}.price, 0) - 1) * 100 END AS ${k}`).join(", ");
+  const flows = FLOWS.map((k) => `CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (c.shares - o_${k}.shares) * NULLIF(c.price, 0) END AS flow_${k}`).join(", ");
   const { rows } = await pool.query(
     // k: fon kodları (recursive skip scan), last: fon başına son veri günü. GROUP BY tüm tabloyu tarıyordu, bu ~3x hızlı.
     `WITH RECURSIVE ref AS (SELECT max(date) d FROM info), pd AS (${dates}),
