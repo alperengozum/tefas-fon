@@ -140,6 +140,17 @@ export const getHoldings = cached(async (code: string): Promise<{ holdings: Hold
   return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: m.rowCount > 0 };
 }, (code) => code);
 
+export type Notif = { disclosure_index: number; published: string; subject: string };
+
+// Fon başına son KAP bildirimleri (tüm türler); tıklanınca KAP'taki bildirim sayfasına gider.
+export async function getNews(code: string, limit = 10): Promise<Notif[]> {
+  const { rows } = await pool.query(
+    `SELECT disclosure_index, published::text, subject FROM kap_notif WHERE code=$1 ORDER BY published DESC LIMIT $2`,
+    [code, limit],
+  );
+  return rows;
+}
+
 // Hisse filtresi: `ticker`ı en az `min` % ağırlıkla tutan fonlar -> {kod: ağırlık}
 export const fundsHolding = cached(async (ticker: string, min: number): Promise<Record<string, number>> => {
   const { rows } = await pool.query(`SELECT code, weight FROM holdings WHERE ticker=$1 AND weight >= $2`, [ticker, min]);

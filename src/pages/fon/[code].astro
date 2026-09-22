@@ -3,7 +3,7 @@ import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import FavButton from "../../components/FavStar";
-import { getBench, getFund, getFunds, getHoldings, overlapping, peers } from "../../lib/db";
+import { getBench, getFund, getFunds, getHoldings, getNews, overlapping, peers } from "../../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
 import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
 import { label, pct, tl, tone } from "../../lib/format";
@@ -20,7 +20,7 @@ const [b100, c100] = br ? [beta(fr, br), corr(fr, br)] : [null, null];
 const roll = rolling(f.history, 91);
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
-const [rivals, { holdings, report, published, note, seen }, overl] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6)]);
+const [rivals, { holdings, report, published, note, seen }, overl, news] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6), getNews(f.code)]);
 // Hisse tutan ama listesi olmayan fonlarda nedenini göster
 const stockPct = f.alloc.hs ?? 0;
 const why = holdings.length || stockPct <= 0 ? null
@@ -106,6 +106,22 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
   )}
 
   {why && <p class="mb-8 rounded-lg border border-dashed p-3 text-sm text-muted-foreground"><b>Hisse portföyü yok:</b> {why}</p>}
+
+  {news.length > 0 && (
+    <section class="mb-8">
+      <h2 class="mb-3 font-semibold">KAP bildirimleri <span class="text-xs font-normal text-muted-foreground">son {news.length} bildirim</span></h2>
+      <ul class="space-y-2 text-sm">
+        {news.map((n) => (
+          <li>
+            <a class="hover:underline" href={`https://www.kap.org.tr/tr/Bildirim/${n.disclosure_index}`} target="_blank" rel="noopener noreferrer">
+              <div class="font-medium">{n.subject}</div>
+              <div class="text-xs text-muted-foreground">{new Date(n.published).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}</div>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )}
 
   {cmp.length > 1 && (
     <section class="mb-8">
