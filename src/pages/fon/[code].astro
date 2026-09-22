@@ -19,7 +19,7 @@ const fr = dailyReturns(f.history, since), br = bench.BIST100 ? dailyReturns(ben
 const [b100, c100] = br ? [beta(fr, br), corr(fr, br)] : [null, null];
 const roll = rolling(f.history, 91);
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
-const flow = (d: number) => { const o = at(d); return o ? (last.shares - o.shares) * last.price : null; };
+const flow = (d: number) => { const o = at(d); return o && last.price ? (last.shares - o.shares) * last.price : null; };
 const [rivals, { holdings, report, published, note, seen }, overl, news] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6), getNews(f.code)]);
 // Hisse tutan ama listesi olmayan fonlarda nedenini göster
 const stockPct = f.alloc.hs ?? 0;

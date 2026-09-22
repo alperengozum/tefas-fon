@@ -7,7 +7,7 @@ export function ret(h: { date: string; price: number }[], days: number | "ytd"):
     : new Date(new Date(last.date).getTime() - days * 864e5);
   const c = cut.toISOString().slice(0, 10);
   const old = [...h].reverse().find((r) => r.date <= c);
-  return old && old.price ? (last.price / old.price - 1) * 100 : null;
+  return old?.price && last.price ? (last.price / old.price - 1) * 100 : null;
 }
 
 // Grafikler en çok 1 yıl gösterir: istemciye yalnız son ~1 yıl ve gereken alanlar gider
