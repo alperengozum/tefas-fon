@@ -97,20 +97,22 @@ export type Detail = {
   code: string; name: string; kind: string;
   history: { date: string; price: number; size: number; investors: number; shares: number }[];
   alloc: Record<string, number>; allocDate: string | null;
-  active?: boolean; tasfiye?: string | null; // sadece getFund doldurur
+  active?: boolean; tasfiye?: string | null; allocKap?: boolean; // sadece getFund doldurur
 };
 
 export const getFund = cached(async (code: string): Promise<Detail | null> => {
   const [h, a, ref, liq] = await Promise.all([
     pool.query(`SELECT kind, name, date::text, price, size, investors, shares FROM info WHERE code=$1 ORDER BY date`, [code]),
-    pool.query(`SELECT date::text, data FROM alloc WHERE code=$1`, [code]),
+    // hisse portföyü varsa varlık dağılımı da KAP raporunun dönem sonundan (aynı güne ait olsun), yoksa son iş günü
+    pool.query(`SELECT COALESCE(m.alloc_date, a.date)::text AS date, COALESCE(m.alloc, a.data) AS data, m.alloc IS NOT NULL AS kap
+      FROM alloc a LEFT JOIN holdings_meta m ON m.code = a.code WHERE a.code=$1`, [code]),
     pool.query(`SELECT (max(date) - ${ACTIVE_DAYS})::text AS min FROM info`),
     pool.query(`SELECT min(published)::text AS d FROM kap_notif WHERE code=$1 AND subject='Fon Tasfiye Duyurusu'`, [code]),
   ]);
   if (!h.rows.length) return null;
   const last = h.rows[h.rows.length - 1];
   const tasfiye = liq.rows[0]?.d ?? null;
-  return { code, name: last.name, kind: last.kind, history: h.rows, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, active: last.date >= ref.rows[0].min && !tasfiye, tasfiye };
+  return { code, name: last.name, kind: last.kind, history: h.rows, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, allocKap: a.rows[0]?.kap ?? false, active: last.date >= ref.rows[0].min && !tasfiye, tasfiye };
 }, (code) => code);
 
 // Rakip analizi: aynı türde, varlık dağılımı en yakın fonlar (öklid mesafesi)

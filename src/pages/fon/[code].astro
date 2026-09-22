@@ -133,7 +133,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 
   <div class="grid gap-8 md:grid-cols-2">
     <section>
-      <h2 class="mb-3 font-semibold">Varlık dağılımı <span class="text-xs font-normal text-muted-foreground">{f.allocDate}</span></h2>
+      <h2 class="mb-3 font-semibold">Varlık dağılımı <span class="text-xs font-normal text-muted-foreground">{f.allocDate}{f.allocKap && " · KAP rapor dönemi sonu"}</span></h2>
       {alloc.length === 0 ? <p class="text-sm text-muted-foreground">Veri yok.</p> : (
         <ul class="space-y-1.5 text-sm">
           {alloc.map(([k, v]) => (
