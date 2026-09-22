@@ -33,3 +33,6 @@ CREATE INDEX IF NOT EXISTS kap_notif_published ON kap_notif (published DESC);
 CREATE TABLE IF NOT EXISTS kap_notif_scanned (day date PRIMARY KEY);
 -- benchmark günlük kapanışları (Yahoo Finance): BIST100 (puan), USD (USD/TRY), ALTIN (gram altın TL)
 CREATE TABLE IF NOT EXISTS bench (sym text NOT NULL, date date NOT NULL, price double precision NOT NULL, PRIMARY KEY (sym, date));
+-- SPK Kurul Bülteni taraması (kap-bulletin.mjs): SPK'nın kendi kararıyla toplu tasfiyeye çıkardığı fonlar PYŞ'nin
+-- KAP bildirimi olarak hiç yayımlanmıyor, bu yüzden ayrı olarak spk.gov.tr'deki haftalık bültenlerden taranıyor
+CREATE TABLE IF NOT EXISTS spk_bulten_scanned (no text PRIMARY KEY);
