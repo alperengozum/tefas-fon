@@ -7,7 +7,7 @@ const MIN_N = 20; // korelasyon/beta için en az ortak gün
 // date -> günlük getiri (oran); yalnız `since` ve sonrası
 export function dailyReturns(h: Pt[], since: string): Map<string, number> {
   const m = new Map<string, number>();
-  for (let i = 1; i < h.length; i++) if (h[i].date >= since && h[i - 1].price > 0) m.set(h[i].date, h[i].price / h[i - 1].price - 1);
+  for (let i = 1; i < h.length; i++) if (h[i].date >= since && h[i - 1].price > 0 && h[i].price > 0) m.set(h[i].date, h[i].price / h[i - 1].price - 1);
   return m;
 }
 
@@ -67,7 +67,7 @@ export type Sim = {
 // start'tan itibaren her ay aynı gün (yoksa sonraki işlem günü) `monthly` TL alım; end'deki fiyatla değerle.
 export function simulate(h: Pt[], monthly: number, start: string, end: string): Sim | null {
   const endRow = lastLE(h, end);
-  if (!endRow) return null;
+  if (!endRow?.price) return null; // 0 = fiyat açıklanmadı
   const s = day(start), d0 = new Date(start + "T00:00:00Z");
   const flows: [string, number][] = [];
   let units = 0;
@@ -77,12 +77,12 @@ export function simulate(h: Pt[], monthly: number, start: string, end: string): 
     if (want > endRow.date) break;
     const row = firstGE(h, want);
     if (!row || row.date > endRow.date) break;
-    if (day(row.date) - day(want) > GAP) continue;
+    if (day(row.date) - day(want) > GAP || !row.price) continue;
     units += monthly / row.price;
     flows.push([row.date, -monthly]);
   }
   const first = firstGE(h, iso(s));
-  if (!flows.length || !first || first.date >= endRow.date || day(first.date) - s > GAP) return null;
+  if (!flows.length || !first?.price || first.date >= endRow.date || day(first.date) - s > GAP) return null;
   const value = units * endRow.price, invested = monthly * flows.length;
   const days = day(endRow.date) - day(first.date);
   const lump = (endRow.price / first.price - 1) * 100;
@@ -98,7 +98,7 @@ export function rolling(h: Pt[], days: number) {
   const r: number[] = [];
   for (const e of h) {
     const want = iso(day(e.date) - days), s = lastLE(h, want);
-    if (s && day(want) - day(s.date) <= GAP && s.price > 0) r.push((e.price / s.price - 1) * 100);
+    if (s && day(want) - day(s.date) <= GAP && s.price > 0 && e.price > 0) r.push((e.price / s.price - 1) * 100);
   }
   if (r.length < 20) return null;
   r.sort((a, b) => a - b);
