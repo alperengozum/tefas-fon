@@ -23,3 +23,6 @@ ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS note text;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS v int NOT NULL DEFAULT 1;
 -- fon başına yıllık volatilite (%); ingest sonunda bir kez hesaplanır (listeleme sorgusunda her istekte hesaplamak ~650ms sürüyordu)
 CREATE TABLE IF NOT EXISTS fund_vol (code text PRIMARY KEY, vol double precision NOT NULL, updated date NOT NULL);
+-- KAP bildirimleri (aynı keşif taramasından, sadece "Fon Tasfiye Duyurusu"): fiyat verisi kesilmeden önce pasif tespiti için
+CREATE TABLE IF NOT EXISTS kap_notif (disclosure_index int PRIMARY KEY, code text NOT NULL, published timestamptz NOT NULL, subject text NOT NULL, name text);
+CREATE INDEX IF NOT EXISTS kap_notif_code ON kap_notif (code, published DESC);

@@ -175,7 +175,7 @@ function FundTableView({ data }: { data: string }) {
           <div className="space-y-1"><div className="text-muted-foreground">TEFAS hisse ağırlığı en az (%)</div>{num("stockMin", "Örn. 50")}</div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Aktif: fonun TEFAS'ta son 7 gün içinde veri yayımlaması; pasif fonların (tasfiye/birleşme) son verisi eskidir, getiri ve nakit akışı gösterilmez. Yönetim ücreti, stopaj ve TEFAS işlem açık/kapalı bilgisi TEFAS API'sinde yok.
+          Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Aktif: fonun TEFAS'ta son 7 gün içinde veri yayımlaması ve KAP'ta tasfiye duyurusu olmaması; pasif fonlarda (tasfiye/birleşme) getiri ve nakit akışı gösterilmez. Yönetim ücreti, stopaj ve TEFAS işlem açık/kapalı bilgisi TEFAS API'sinde yok.
         </p>
       </details>
 

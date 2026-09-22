@@ -34,13 +34,16 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
     // k: fon kodları (recursive skip scan), last: fon başına son veri günü. GROUP BY tüm tabloyu tarıyordu, bu ~3x hızlı.
     `WITH RECURSIVE ref AS (SELECT max(date) d FROM info), pd AS (${dates}),
      k AS (SELECT min(code) code FROM info UNION ALL SELECT (SELECT min(code) FROM info WHERE code > k.code) FROM k WHERE k.code IS NOT NULL),
-     last AS (SELECT code, (SELECT max(date) FROM info WHERE info.code = k.code) d FROM k WHERE code IS NOT NULL)
-     SELECT c.code, c.kind, c.name, c.price, c.size, c.investors, ref.d::text AS ref, c.date >= ref.d - ${ACTIVE_DAYS} AS active,
+     last AS (SELECT code, (SELECT max(date) FROM info WHERE info.code = k.code) d FROM k WHERE code IS NOT NULL),
+     liq AS (SELECT DISTINCT code FROM kap_notif WHERE subject = 'Fon Tasfiye Duyurusu')
+     SELECT c.code, c.kind, c.name, c.price, c.size, c.investors, ref.d::text AS ref,
+            (c.date >= ref.d - ${ACTIVE_DAYS} AND liq.code IS NULL) AS active,
             m.main, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, ${rets}, ${flows}
      FROM last JOIN info c ON c.code = last.code AND c.date = last.d CROSS JOIN ref
      ${joins}
      LEFT JOIN alloc a ON a.code = c.code
      LEFT JOIN fund_vol v ON v.code = c.code
+     LEFT JOIN liq ON liq.code = c.code
      LEFT JOIN LATERAL (SELECT key AS main FROM jsonb_each_text(a.data) ORDER BY value::float8 DESC LIMIT 1) m ON true
      WHERE c.kind = $1 AND c.size IS NOT NULL
      ORDER BY c.size DESC`,
@@ -89,18 +92,20 @@ export type Detail = {
   code: string; name: string; kind: string;
   history: { date: string; price: number; size: number; investors: number; shares: number }[];
   alloc: Record<string, number>; allocDate: string | null;
-  active?: boolean; // sadece getFund doldurur
+  active?: boolean; tasfiye?: string | null; // sadece getFund doldurur
 };
 
 export const getFund = cached(async (code: string): Promise<Detail | null> => {
-  const [h, a, ref] = await Promise.all([
+  const [h, a, ref, liq] = await Promise.all([
     pool.query(`SELECT kind, name, date::text, price, size, investors, shares FROM info WHERE code=$1 ORDER BY date`, [code]),
     pool.query(`SELECT date::text, data FROM alloc WHERE code=$1`, [code]),
     pool.query(`SELECT (max(date) - ${ACTIVE_DAYS})::text AS min FROM info`),
+    pool.query(`SELECT min(published)::text AS d FROM kap_notif WHERE code=$1 AND subject='Fon Tasfiye Duyurusu'`, [code]),
   ]);
   if (!h.rows.length) return null;
   const last = h.rows[h.rows.length - 1];
-  return { code, name: last.name, kind: last.kind, history: h.rows, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, active: last.date >= ref.rows[0].min };
+  const tasfiye = liq.rows[0]?.d ?? null;
+  return { code, name: last.name, kind: last.kind, history: h.rows, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, active: last.date >= ref.rows[0].min && !tasfiye, tasfiye };
 }, (code) => code);
 
 // Rakip analizi: aynı türde, varlık dağılımı en yakın fonlar (öklid mesafesi)
