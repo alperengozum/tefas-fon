@@ -14,5 +14,6 @@ COPY --from=build /app/dist ./dist
 COPY db ./db
 COPY scripts ./scripts
 COPY start.sh ./
+USER node
 EXPOSE 4321
 CMD ["sh", "start.sh"]

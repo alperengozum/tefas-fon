@@ -181,6 +181,16 @@ test("/api/holdings: geçersiz ticker {} döner, JSON + cache header", async ({ 
   expect(await (await request.get("/api/holdings?ticker=%27%3B--")).json()).toEqual({});
 });
 
+test("güvenlik başlıkları + IP başına istek sınırı (429)", async ({ request }) => {
+  const h = (await request.get("/api/holdings?ticker=A")).headers();
+  expect(h["x-frame-options"]).toBe("DENY");
+  expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
+  test.skip(!!process.env.E2E_BASE_URL, "Cloudflare cf-connecting-ip'i gerçek IP ile ezer");
+  const ip = { "cf-connecting-ip": `203.0.113.${Date.now() % 250}` };
+  const codes = await Promise.all(Array.from({ length: 51 }, () => request.get("/api/holdings?ticker=A", { headers: ip }).then((r) => r.status())));
+  expect(codes.filter((c) => c === 429)).toHaveLength(1);
+});
+
 test("sonsuz kaydırma: alta inince satırlar 100'den artar", async ({ page }) => {
   await ready(page);
   test.skip((await total(page)) <= 100, "100'den az fon var");

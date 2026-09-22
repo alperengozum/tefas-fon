@@ -1,6 +1,8 @@
 import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
 
+// Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
+if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas",
 });
