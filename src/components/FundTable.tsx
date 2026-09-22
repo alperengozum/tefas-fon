@@ -76,7 +76,7 @@ function FundTableView({ data, favOnly }: { data: string; favOnly: boolean }) {
   useEffect(() => {
     const t = f.stock.trim().toUpperCase();
     if (t.length < 2) return setByStock(null);
-    const id = setTimeout(() => fetch(`/api/holdings?ticker=${t}&min=${Number(f.stockW) || 0}`).then((r) => r.json()).then(setByStock).catch(() => setByStock({})), 250);
+    const id = setTimeout(() => fetch(`/api/holdings?ticker=${encodeURIComponent(t)}&min=${Number(f.stockW) || 0}`).then((r) => r.json()).then(setByStock).catch(() => setByStock({})), 250);
     return () => clearTimeout(id);
   }, [f.stock, f.stockW]);
 
