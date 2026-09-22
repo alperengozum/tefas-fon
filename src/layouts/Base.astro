@@ -19,7 +19,7 @@ const path = Astro.url.pathname;
         {tabs.map(([k, l]) => (
           <a href={`/fonlar/${k}`} class={path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
         ))}
-        {[["/karsilastir", "Karşılaştır"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"], ["/favoriler", "★ Favorilerim"]].map(([h, l]) => (
+        {[["/karsilastir", "Karşılaştır"], ["/hisse", "Hisse Ara"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"], ["/favoriler", "★ Favorilerim"]].map(([h, l]) => (
           <a href={h} class={path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
         ))}
       </nav>

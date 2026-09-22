@@ -1,0 +1,20 @@
+---
+import Base from "../../layouts/Base.astro";
+const notFound = Astro.url.searchParams.get("bulunamadi");
+---
+<Base title="Hisse Ara · TEFAS Fon Analiz">
+  <h1 class="mb-1 text-xl font-semibold">Hisse Ara</h1>
+  <p class="mb-4 text-sm text-muted-foreground">Bir hisse kodu girin, o hisseyi hangi fonların ne oranda tuttuğunu görün.</p>
+  {notFound && <p class="mb-4 text-sm text-red-600">"{notFound}" hissesini tutan fon bulunamadı.</p>}
+  <form id="hisse-form" class="flex flex-wrap gap-2">
+    <input name="t" placeholder="Örn. THYAO" autofocus class="h-8 w-full rounded-lg sm:w-64 border bg-transparent px-2 text-sm uppercase" />
+    <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Ara</button>
+  </form>
+  <script>
+    document.getElementById("hisse-form")!.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const t = new FormData(e.target as HTMLFormElement).get("t")?.toString().trim().toUpperCase();
+      if (t) location.href = `/hisse/${encodeURIComponent(t)}`;
+    });
+  </script>
+</Base>

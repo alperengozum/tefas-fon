@@ -5,7 +5,7 @@ import { tl } from "../../lib/format";
 
 const ticker = (Astro.params.ticker ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const rows = ticker.length >= 2 ? await tickerFunds(ticker) : [];
-if (!rows.length) return new Response("Bu hisseyi tutan fon bulunamadı", { status: 404 });
+if (!rows.length) return Astro.redirect(`/hisse?bulunamadi=${ticker}`);
 const total = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
 ---
 <Base title={`${ticker} hissesini tutan fonlar · TEFAS Fon Analiz`}>
