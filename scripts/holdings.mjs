@@ -11,6 +11,7 @@ const norm = (s) => s.toUpperCase().replace(/İ/g, "I").replace(/[ÖÜŞÇĞ]/g,
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ymd = (d) => d.toISOString().slice(0, 10);
 const num = (s) => Number(s.replace(/\./g, "").replace(",", "."));
+const kapDate = (s) => { const [d, t] = s.split(" "); return `${d.split(".").reverse().join("-")}T${t}+03:00`; }; // "21.09.2026 19:51:34" -> ISO (KAP saatleri TR yerel)
 
 // KAP hız sınırı uyguluyor (429). Tüm istekler tek kapıdan geçer: en az `gap` ms aralık, 429'da aralık büyür ve uzun bekler.
 const MIN_GAP = 3000; // ~20 istek/dk: daha hızlısında KAP bağlantıları kesiyor
@@ -126,6 +127,12 @@ async function discover(db, days) {
         `INSERT INTO kap_pdr SELECT * FROM unnest($1::int[], $2::text[], $3::date[], $4::text[], $5::text[]) ON CONFLICT DO NOTHING`,
         [p.map((x) => x.disclosureIndex), p.map((x) => x.fundCode), p.map((x) => x.publishDate.slice(0, 10).split(".").reverse().join("-")),
          p.map((x) => `${x.ruleType} ${x.year ?? ""}`.trim()), p.map((x) => x.kapTitle)]);
+    // aynı günlük listeden tüm bildirim türleri (haberler/detay sayfası için); ekstra KAP isteği yok
+    const all = list.filter((x) => x.fundCode);
+    if (all.length)
+      await db.query(
+        `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO NOTHING`,
+        [all.map((x) => x.disclosureIndex), all.map((x) => x.fundCode), all.map((x) => kapDate(x.publishDate)), all.map((x) => x.subject), all.map((x) => x.kapTitle)]);
     await db.query("INSERT INTO kap_scanned VALUES ($1) ON CONFLICT DO NOTHING", [d]);
   }
   return (await db.query("SELECT DISTINCT ON (code) code, disclosure_index, published::text AS published, rule, title FROM kap_pdr ORDER BY code, disclosure_index DESC")).rows;
