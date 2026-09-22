@@ -10,9 +10,8 @@ const HDR = { "Content-Type": "application/json", Referer: KAP, "User-Agent": "M
 const norm = (s) => s.toUpperCase().replace(/İ/g, "I").replace(/[ÖÜŞÇĞ]/g, (c) => ({ Ö: "O", Ü: "U", Ş: "S", Ç: "C", Ğ: "G" })[c]).replace(/[^A-Z0-9]/g, "");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ymd = (d) => d.toISOString().slice(0, 10);
-// KAP publishDate "GG.AA.YYYY SS:dd:ss" formatında, saat dilimi belirtilmez: Türkiye sabit +03.
-const kapTs = (s) => { const [d, t] = s.split(" "); return `${d.split(".").reverse().join("-")}T${t || "00:00:00"}+03:00`; };
 const num = (s) => Number(s.replace(/\./g, "").replace(",", "."));
+const kapDate = (s) => { const [d, t] = s.split(" "); return `${d.split(".").reverse().join("-")}T${t}+03:00`; }; // "21.09.2026 19:51:34" -> ISO (KAP saatleri TR yerel)
 
 // KAP hız sınırı uyguluyor (429). Tüm istekler tek kapıdan geçer: en az `gap` ms aralık, 429'da aralık büyür ve uzun bekler.
 const MIN_GAP = 3000; // ~20 istek/dk: daha hızlısında KAP bağlantıları kesiyor
@@ -119,8 +118,11 @@ export async function parsePdr(buf, expected) {
 async function discover(db, days) {
   for (let i = 0; i < days; i++) {
     const d = ymd(new Date(Date.now() - i * 864e5));
-    // son 2 gün her seferinde yeniden taranır (gün içinde yeni bildirim gelir)
-    if (i >= 2 && (await db.query("SELECT 1 FROM kap_scanned WHERE day=$1", [d])).rowCount) continue;
+    // son 2 gün her seferinde yeniden taranır (gün içinde yeni bildirim gelir); kap_notif_scanned kap_scanned'dan
+    // ayrı tutulur ki kap_notif eklendiğinde zaten kap_scanned'a düşmüş eski günler de bir kereliğine yeniden çekilip geriye dönük dolsun.
+    const pdrDone = i >= 2 && (await db.query("SELECT 1 FROM kap_scanned WHERE day=$1", [d])).rowCount;
+    const notifDone = i >= 2 && (await db.query("SELECT 1 FROM kap_notif_scanned WHERE day=$1", [d])).rowCount;
+    if (pdrDone && notifDone) continue;
     const list = await (await kap("api/disclosure/funds/byCriteria", { method: "POST", body: JSON.stringify({ fromDate: d, toDate: d, fundTypes: [], mkkMemberOid: null, disclosureClass: "", subjectList: [], index: "" }) })).json();
     const p = list.filter((x) => x.subject === "Portföy Dağılım Raporu" && x.fundCode);
     if (p.length)
@@ -128,13 +130,14 @@ async function discover(db, days) {
         `INSERT INTO kap_pdr SELECT * FROM unnest($1::int[], $2::text[], $3::date[], $4::text[], $5::text[]) ON CONFLICT DO NOTHING`,
         [p.map((x) => x.disclosureIndex), p.map((x) => x.fundCode), p.map((x) => x.publishDate.slice(0, 10).split(".").reverse().join("-")),
          p.map((x) => `${x.ruleType} ${x.year ?? ""}`.trim()), p.map((x) => x.kapTitle)]);
-    // tasfiye duyurusu: fon TEFAS'a fiyat göndermeyi kesmeden günler/haftalar önce yayımlanabiliyor, data yaşına dayalı "pasif" tespiti bunu kaçırıyor
-    const t = list.filter((x) => x.subject === "Fon Tasfiye Duyurusu" && x.fundCode);
-    if (t.length)
+    // aynı günlük listeden tüm bildirim türleri (haberler/detay sayfası + "Fon Tasfiye Duyurusu" aktif/pasif tespitinde kullanılıyor); ekstra KAP isteği yok
+    const all = list.filter((x) => x.fundCode);
+    if (all.length)
       await db.query(
-        `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT DO NOTHING`,
-        [t.map((x) => x.disclosureIndex), t.map((x) => x.fundCode), t.map((x) => kapTs(x.publishDate)), t.map((x) => x.subject), t.map((x) => x.kapTitle)]);
+        `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO NOTHING`,
+        [all.map((x) => x.disclosureIndex), all.map((x) => x.fundCode), all.map((x) => kapDate(x.publishDate)), all.map((x) => x.subject), all.map((x) => x.kapTitle)]);
     await db.query("INSERT INTO kap_scanned VALUES ($1) ON CONFLICT DO NOTHING", [d]);
+    await db.query("INSERT INTO kap_notif_scanned VALUES ($1) ON CONFLICT DO NOTHING", [d]);
   }
   return (await db.query("SELECT DISTINCT ON (code) code, disclosure_index, published::text AS published, rule, title FROM kap_pdr ORDER BY code, disclosure_index DESC")).rows;
 }

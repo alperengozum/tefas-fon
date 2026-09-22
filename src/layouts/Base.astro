@@ -3,6 +3,7 @@ import "../styles/global.css";
 const { title = "TEFAS Fon Analiz" } = Astro.props;
 const tabs = [["yat", "Yatırım Fonları"], ["bes", "Emeklilik (BES)"], ["byf", "BYF"], ["gyf", "GYF"]];
 const path = Astro.url.pathname;
+const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
 ---
 <html lang="tr">
   <head>
@@ -13,15 +14,52 @@ const path = Astro.url.pathname;
     <slot name="head" />
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
-    <header class="border-b">
-      <nav class="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-4 gap-y-1 px-4 sm:gap-x-6 py-3 text-sm">
+    {showDisclaimer && (
+      <div class="no-print border-b bg-amber-50 px-4 py-2 text-center text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        Bu site yatırım tavsiyesi değildir. Veriler TEFAS'ın kamuya açık API'sinden derlenmiştir, sitenin verisi değildir ve doğruluğu garanti edilmez; yatırım kararı vermeden önce resmi kaynakları kontrol edin.
+        <a href="/terms" class="underline">Detaylar</a>
+      </div>
+    )}
+    <header class="no-print border-b">
+      <nav class="relative mx-auto flex max-w-[1700px] items-center gap-x-4 px-4 sm:flex-wrap sm:gap-x-6 sm:gap-y-1 py-3 text-sm">
         <a href="/" class="font-semibold">TEFAS Fon Analiz</a>
-        {tabs.map(([k, l]) => (
-          <a href={`/fonlar/${k}`} class={path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
-        ))}
-        <a href="/karsilastir" class={path === "/karsilastir" ? "font-medium" : "text-muted-foreground hover:text-foreground"}>Karşılaştır</a>
+        <button
+          id="nav-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="nav-links"
+          aria-label="Menü"
+          class="ml-auto rounded p-2 hover:bg-accent sm:hidden"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
+        </button>
+        <div id="nav-links" class="absolute inset-x-0 top-full z-40 hidden flex-col gap-1 border-b bg-background p-2 shadow-lg sm:static sm:z-auto sm:flex sm:w-auto sm:flex-row sm:items-center sm:gap-x-6 sm:gap-y-1 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+          {tabs.map(([k, l]) => (
+            <a href={`/fonlar/${k}`} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
+          ))}
+          {[["/karsilastir", "Karşılaştır"], ["/hisse", "Hisse Ara"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"], ["/favoriler", "★ Favorilerim"]].map(([h, l]) => (
+            <a href={h} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
+          ))}
+        </div>
       </nav>
     </header>
+    <script>
+      const toggle = document.getElementById("nav-toggle");
+      const links = document.getElementById("nav-links");
+      toggle?.addEventListener("click", () => {
+        const open = toggle.getAttribute("aria-expanded") === "true";
+        toggle.setAttribute("aria-expanded", String(!open));
+        links?.classList.toggle("hidden", open);
+        links?.classList.toggle("flex", !open);
+      });
+    </script>
     <main class="mx-auto max-w-[1700px] px-3 py-4 sm:px-4 sm:py-6"><slot /></main>
+    <footer class="no-print border-t mt-8 px-4 py-4 text-center text-xs text-muted-foreground">
+      <a href="/terms" class="hover:text-foreground">Terms</a>
+      <span class="mx-2">·</span>
+      <a href="/privacy-policy" class="hover:text-foreground">Privacy Policy</a>
+      <span class="mx-2">·</span>
+      <a href="https://github.com/alperengozum/tefas-fon/blob/main/LICENSE" target="_blank" rel="noopener" class="hover:text-foreground">License</a>
+    </footer>
   </body>
 </html>

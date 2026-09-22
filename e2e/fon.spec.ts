@@ -102,7 +102,7 @@ test("risk aralığı: min 2 > maks 1 boş liste verir", async ({ page }) => {
 test("fon türü seçici listeyi daraltır", async ({ page }) => {
   await ready(page);
   const all = await total(page);
-  await page.locator("[data-slot=select-trigger]").first().click();
+  await page.locator("[data-slot=select-trigger]", { hasText: "Tüm fon türleri" }).click();
   const opt = page.getByRole("option").nth(1);
   const name = (await opt.innerText()).trim();
   await opt.click();
@@ -167,7 +167,8 @@ test("karşılaştırma: boş durum ve form ile kod girişi", async ({ page }) =
   const code = await codeAt(page);
   await page.goto("/karsilastir");
   await expect(page.getByText("Fon listesinden kutucukları işaretleyin")).toBeVisible();
-  await page.getByPlaceholder(/Fon kodları/).fill(code.toLowerCase());
+  await page.getByRole("combobox", { name: "Fon ekle" }).fill(code.toLowerCase()); // küçük harf de bulunmalı
+  await page.getByRole("option").first().click();
   await page.getByRole("button", { name: "Karşılaştır" }).click();
   await expect(page.locator("thead")).toContainText(code);
 });
@@ -188,4 +189,96 @@ test("sonsuz kaydırma: alta inince satırlar 100'den artar", async ({ page }) =
   await expect.poll(() => rows(page).count()).toBeGreaterThan(100);
   await page.mouse.wheel(0, 100000);
   await expect.poll(() => rows(page).count()).toBeGreaterThan(200);
+});
+
+// --- endeks, korelasyon/örtüşme, hisse sayfası, portföy, simülasyon ---
+// DB'de birden çok fonun tuttuğu bir hisse (EREGL) kullanılır; yoksa atlanır
+const holders = async (request) => Object.keys(await (await request.get("/api/holdings?ticker=EREGL")).json());
+
+test("fon detay: endekslere karşı tablo ve grafik", async ({ page }) => {
+  await ready(page);
+  await page.goto(`/fon/${await codeAt(page)}`);
+  await expect(page.getByRole("heading", { name: /Endekslere karşı/ })).toBeVisible();
+  for (const t of ["BIST 100", "USD/TRY", "Gram altın"]) await expect(page.getByRole("cell", { name: t })).toBeVisible();
+});
+
+test("hisse sayfası: hisseyi tutan fonlar; bilinmeyen hisse 404", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto("/hisse/EREGL");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("EREGL");
+  await expect(page.locator(`a[href="/fon/${codes[0]}"]`)).toBeVisible();
+  expect((await request.get("/hisse/ZZZZ9")).status()).toBe(404);
+});
+
+test("karşılaştır: korelasyon + hisse örtüşmesi matrisi, endeks çizgileri", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto(`/karsilastir?codes=${codes[0]},${codes[1]}&endeks=1`);
+  await expect(page.getByRole("heading", { name: /Getiri korelasyonu/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Hisse örtüşmesi/ })).toBeVisible();
+  await expect(page.locator(".recharts-legend-item-text", { hasText: "BIST100" })).toBeVisible();
+});
+
+test("simülasyon: fon ve endeksler için SIP/tek seferlik sonuç", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 1, "DB'de EREGL portföy verisi yok");
+  await page.goto(`/simulasyon?codes=${codes[0]}&monthly=1000`);
+  await expect(page.locator("tbody tr").first()).toContainText(codes[0]);
+  await expect(page.locator("tbody tr", { hasText: "BIST 100" })).toContainText("%");
+});
+
+// fon seçici: koda küçük harfle yaz, listeden ilk eşleşmeyi seç (combobox adı `name`)
+const pick = async (page, name, code, nth = 0) => {
+  await page.getByRole("combobox", { name }).nth(nth).fill(code.toLowerCase());
+  await page.getByRole("option").first().click();
+};
+
+test("portföy: seçicilerle tutar ve adet gir, birleşik analiz, tarayıcıda hatırlanır", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto("/portfoy");
+  await pick(page, "Fon 1", codes[0]);
+  await page.getByLabel("Tutar (₺)").fill("1000");
+  await page.getByRole("button", { name: "Fon ekle" }).click();
+  await pick(page, "Fon 2", codes[1]);
+  await page.locator("select").nth(1).selectOption("adet");
+  await page.getByLabel("Adet", { exact: true }).fill("50");
+  await page.getByRole("button", { name: "Analiz et" }).click();
+  await expect(page).toHaveURL(new RegExp(`f=${codes[0]}%3Atl%3A1000.*f=${codes[1]}%3Aadet%3A50`));
+  await expect(page.getByRole("heading", { name: "Birleşik varlık dağılımı" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Getiri korelasyonu/ })).toBeVisible();
+  await expect(page.locator("th", { hasText: "Adet" })).toBeVisible();
+  await page.goto("/portfoy"); // parametre yok -> localStorage'dan geri yüklenir
+  await expect(page).toHaveURL(new RegExp(`f=${codes[0]}`));
+  await expect(page.getByTestId("portfoy-satir")).toHaveCount(2);
+});
+
+test("simülasyon: çoklu fon seçici çip ekler/çıkarır, form ?codes= gönderir", async ({ page, request }) => {
+  const codes = await holders(request);
+  test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
+  await page.goto("/simulasyon");
+  await expect(page.locator("table")).toHaveCount(0); // sonuç (endeks satırları dahil) Hesapla'dan önce görünmez
+  await page.getByRole("button", { name: "Hesapla" }).click(); // fon seçmeden Hesapla: tablo yok, uyarı var
+  await expect(page.getByText("Hesaplamak için en az bir fon seç")).toBeVisible();
+  await expect(page.locator("table")).toHaveCount(0);
+  await pick(page, "Fon ekle", codes[0]);
+  await pick(page, "Fon ekle", codes[1]);
+  await page.getByRole("button", { name: `${codes[1]} fonunu çıkar` }).click();
+  await page.getByRole("button", { name: "Hesapla" }).click();
+  await expect(page).toHaveURL(new RegExp(`codes=${codes[0]}(&|$)`));
+  await expect(page.locator("tbody tr").first()).toContainText(codes[0]);
+});
+
+test("favoriler: listede yıldızla ekle, /favoriler'de görün, detayda çıkar", async ({ page }) => {
+  await ready(page);
+  const code = await codeAt(page);
+  await rows(page).first().getByRole("button", { name: "Favorilere ekle" }).click();
+  await page.goto("/favoriler");
+  await expect(rows(page)).toHaveCount(1);
+  await expect(rows(page).first().locator("td").nth(1)).toHaveText(code);
+  await page.goto(`/fon/${code}`);
+  await page.getByRole("button", { name: "Favorilerden çıkar" }).click();
+  await page.goto("/favoriler");
+  await expect(page.getByText("Henüz favori fon yok")).toBeVisible();
 });

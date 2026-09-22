@@ -1,5 +1,5 @@
 import pg from "pg";
-import { classify, riskOf } from "./classify";
+import { classify, fold, riskOf } from "./classify";
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas",
@@ -50,6 +50,11 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
     [kind],
   );
   const funds = rows.map((r) => ({ ...r, ...classify(r.name, r.kind), risk: riskOf(r.vol) }));
+  // Aynı kurucu İ/I farkıyla ayrı yazılmış olabilir (AZİMUT/AZIMUT): katlanmış anahtara göre en sık yazımı kullan.
+  const count = new Map<string, number>(), best = new Map<string, string>();
+  for (const { founder: n } of funds) count.set(n, (count.get(n) ?? 0) + 1);
+  for (const [n, c] of count) { const k = fold(n), b = best.get(k); if (!b || c > count.get(b)!) best.set(k, n); }
+  for (const f of funds) f.founder = best.get(fold(f.founder))!;
   return { ref: rows[0]?.ref ?? "", funds };
 }
 
@@ -140,6 +145,17 @@ export const getHoldings = cached(async (code: string): Promise<{ holdings: Hold
   return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: m.rowCount > 0 };
 }, (code) => code);
 
+export type Notif = { disclosure_index: number; published: string; subject: string };
+
+// Fon başına son KAP bildirimleri (tüm türler); tıklanınca KAP'taki bildirim sayfasına gider.
+export async function getNews(code: string, limit = 10): Promise<Notif[]> {
+  const { rows } = await pool.query(
+    `SELECT disclosure_index, published::text, subject FROM kap_notif WHERE code=$1 ORDER BY published DESC LIMIT $2`,
+    [code, limit],
+  );
+  return rows;
+}
+
 // Hisse filtresi: `ticker`ı en az `min` % ağırlıkla tutan fonlar -> {kod: ağırlık}
 export const fundsHolding = cached(async (ticker: string, min: number): Promise<Record<string, number>> => {
   const { rows } = await pool.query(`SELECT code, weight FROM holdings WHERE ticker=$1 AND weight >= $2`, [ticker, min]);
@@ -164,3 +180,35 @@ export const getFunds = cached(async (codes: string[]): Promise<{ funds: Detail[
   });
   return { funds, holdings };
 }, (codes) => codes.join(","));
+
+// Benchmark serileri (BIST100, USD, ALTIN), fon geçmişiyle aynı {date, price} biçiminde. Tablo boşsa {}.
+// TEFAS'ta D tarihli fon fiyatı bir önceki işlem gününün kapanışını yansıtır (AKU/BIST100 korelasyonu: gecikme 0'da 0.00,
+// -1'de 0.98), bu yüzden her endeks kapanışı bir sonraki işlem gününün tarihiyle etiketlenir; en son kapanış (henüz fon karşılığı yok) atılır.
+export const getBench = cached(async (): Promise<Record<string, { date: string; price: number }[]>> => {
+  const { rows } = await pool.query(`SELECT sym, date::text, price FROM bench ORDER BY sym, date`);
+  const raw: Record<string, { date: string; price: number }[]> = {};
+  for (const r of rows) (raw[r.sym] ??= []).push({ date: r.date, price: r.price });
+  return Object.fromEntries(Object.entries(raw).map(([s, h]) => [s, h.slice(0, -1).map((r, i) => ({ date: h[i + 1].date, price: r.price }))]));
+}, () => "b");
+
+// `code` fonuyla ortak hisse ağırlığı (Σ min) en yüksek fonlar
+export const overlapping = cached(async (code: string, n = 8): Promise<{ code: string; name: string; ov: number }[]> => (await pool.query(
+  `WITH o AS (
+     SELECT b.code, sum(least(a.weight, b.weight)) AS ov FROM holdings a JOIN holdings b ON b.ticker = a.ticker AND b.code <> a.code
+     WHERE a.code = $1 GROUP BY b.code ORDER BY ov DESC LIMIT $2)
+   SELECT o.code, i.name, o.ov FROM o JOIN LATERAL (SELECT name FROM info WHERE code = o.code ORDER BY date DESC LIMIT 1) i ON true ORDER BY o.ov DESC`,
+  [code, n],
+)).rows, (code, n) => `${code}|${n}`);
+
+// Bir hisseyi tutan tüm fonlar: ağırlık, fon büyüklüğü ve tahmini pozisyon (ağırlık x büyüklük)
+export const tickerFunds = cached(async (ticker: string): Promise<{ code: string; name: string; kind: string; weight: number; size: number | null; amount: number | null }[]> => (await pool.query(
+  `SELECT h.code, i.name, i.kind, h.weight, i.size, h.weight / 100 * i.size AS amount FROM holdings h
+   JOIN LATERAL (SELECT name, kind, size FROM info WHERE code = h.code ORDER BY date DESC LIMIT 1) i ON true
+   WHERE h.ticker = $1 ORDER BY amount DESC NULLS LAST`,
+  [ticker],
+)).rows, (t) => t);
+
+// Fonlarda geçen tüm hisse kodları (arama kutusunda öneri için)
+export const allTickers = cached(async (): Promise<string[]> =>
+  (await pool.query(`SELECT DISTINCT ticker FROM holdings ORDER BY ticker`)).rows.map((r) => r.ticker),
+() => "a");

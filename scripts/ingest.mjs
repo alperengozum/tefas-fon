@@ -17,6 +17,7 @@ const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres
 await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
 if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece şema
 if (process.argv[2] === "vol") { await computeVol(); await db.end(); process.exit(0); } // sadece volatilite
+if (process.argv[2] === "bench") { await fetchBench(); await db.end(); process.exit(0); } // sadece benchmark
 
 // ponytail: sabit 11sn aralık (TEFAS: dk'da 6 istek), hatada 65sn bekle. İstek başı max ~1 ay.
 let last = 0;
@@ -58,6 +59,29 @@ async function computeVol() {
     await c.query("COMMIT");
   } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
   console.log("volatilite güncellendi");
+}
+
+// Benchmark: BIST100, USD/TRY ve gram altın (ons altın x USD/TRY / 31,1035) günlük kapanışları, Yahoo Finance'ten (auth'suz).
+async function yahoo(sym) {
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=5y&interval=1d`, { headers: { "User-Agent": HDR["User-Agent"] }, signal: AbortSignal.timeout(30000) });
+  const r = (await res.json()).chart?.result?.[0];
+  if (!r) throw new Error("Yahoo boş yanıt: " + sym);
+  const c = r.indicators.quote[0].close;
+  // Yahoo aynı güne iki bar verebiliyor (ör. gün içi + kapanış): tarihe göre tekilleştir, sonuncusu kalır (INSERT tek satıra iki kez yazamaz)
+  return [...new Map(r.timestamp.map((t, i) => [ymd(new Date((t + r.meta.gmtoffset) * 1000)), c[i]]).filter(([, v]) => v > 0))];
+}
+async function fetchBench() {
+  try {
+    const [bist, usd, gold] = await Promise.all(["XU100.IS", "USDTRY=X", "GC=F"].map(yahoo));
+    let u = 0, i = 0;
+    const gram = gold.flatMap(([d, g]) => { while (i < usd.length && usd[i][0] <= d) u = usd[i++][1]; return u ? [[d, (g * u) / 31.1035]] : []; });
+    for (const [sym, rows] of [["BIST100", bist], ["USD", usd], ["ALTIN", gram]])
+      await db.query(
+        `INSERT INTO bench SELECT $1, * FROM unnest($2::date[], $3::float8[]) ON CONFLICT (sym, date) DO UPDATE SET price = EXCLUDED.price`,
+        [sym, rows.map((r) => r[0]), rows.map((r) => r[1])],
+      );
+    console.log("benchmark güncellendi");
+  } catch (e) { console.log("benchmark alınamadı:", e.message); } // ana ingest'i düşürmesin
 }
 
 async function save(kind, rows) {
@@ -113,4 +137,5 @@ for (const kind of KINDS) {
   }
 }
 await computeVol();
+await fetchBench();
 await db.end();

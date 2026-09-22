@@ -1,0 +1,33 @@
+---
+import Base from "../../layouts/Base.astro";
+import { tickerFunds } from "../../lib/db";
+import { tl } from "../../lib/format";
+
+const ticker = (Astro.params.ticker ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const rows = ticker.length >= 2 ? await tickerFunds(ticker) : [];
+if (!rows.length) return new Response("Bu hisseyi tutan fon bulunamadı", { status: 404 });
+const total = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+---
+<Base title={`${ticker} hissesini tutan fonlar · TEFAS Fon Analiz`}>
+  <h1 class="mb-1 text-xl font-semibold">{ticker} <span class="text-base font-normal text-muted-foreground">hissesini tutan fonlar</span></h1>
+  <p class="mb-4 text-sm text-muted-foreground">
+    {rows.length} fon · tahmini toplam pozisyon <b class="text-foreground">{tl(total)}</b> (ağırlık × fon büyüklüğü; KAP raporu tarihindeki ağırlık, güncel büyüklük).
+    <a class="underline" href={`/fonlar/yat?hisse=${ticker}`}>Fon listesinde filtrele</a>
+  </p>
+  <div class="overflow-x-auto rounded-lg border">
+    <table class="w-full text-sm tabular-nums">
+      <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Tür</th><th class="p-2">Ağırlık</th><th class="p-2">Fon büyüklüğü</th><th class="p-2">Tahmini pozisyon</th></tr></thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr class="border-t">
+            <td class="p-2"><a class="hover:underline" href={`/fon/${r.code}`}><b>{r.code}</b> <span class="text-muted-foreground">{r.name}</span></a></td>
+            <td class="p-2 text-right">{r.kind}</td>
+            <td class="p-2 text-right">{r.weight.toFixed(2)}%</td>
+            <td class="p-2 text-right">{tl(r.size)}</td>
+            <td class="p-2 text-right">{tl(r.amount)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Base>

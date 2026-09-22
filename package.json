@@ -8,13 +8,13 @@
     "ingest": "node scripts/ingest.mjs",
     "db:init": "psql \"${DATABASE_URL:-postgres://tefas:tefas@localhost/tefas}\" -f db/schema.sql",
     "holdings": "node scripts/holdings.mjs",
-    "test": "node --test test/parse.test.mjs",
+    "test": "node --experimental-strip-types --no-warnings --test test/*.test.mjs",
     "test:e2e": "playwright test"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "author": "Alperen Gözüm",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "description": "TEFAS fon listeleme / analiz / karşılaştırma",
   "dependencies": {
     "@astrojs/node": "^11.1.6",
     "@astrojs/react": "^6.0.6",

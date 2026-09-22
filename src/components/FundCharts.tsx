@@ -25,11 +25,11 @@ export default function FundCharts({ history }: { history: H }) {
       <div className="h-72">
         <ResponsiveContainer>
           <AreaChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} />
-            <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} tickFormatter={(v) => fmt(v)} width={70} />
+            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-muted-foreground/30" />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" minTickGap={40} />
+            <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" tickFormatter={(v) => fmt(v)} width={70} />
             <Tooltip formatter={(v: number) => fmt(v)} />
-            <Area type="monotone" dataKey={metric} stroke="var(--color-chart-1, #2563eb)" fill="var(--color-chart-1, #2563eb)" fillOpacity={0.15} dot={false} isAnimationActive={false} />
+            <Area type="monotone" dataKey={metric} name={METRICS[metric][0]} stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} dot={false} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>

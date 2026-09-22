@@ -2,6 +2,9 @@
 const norm = (s: string) =>
   s.toUpperCase().replace(/İ/g, "I").replace(/Ö/g, "O").replace(/Ü/g, "U").replace(/Ş/g, "S").replace(/Ç/g, "C").replace(/Ğ/g, "G");
 
+// I/İ/ı/i aynı sayılır (TEFAS adlarında tutarsız): arama ve kurucu birleştirme için.
+export const fold = (s: string) => s.toLocaleLowerCase("tr").replace(/ı/g, "i");
+
 const TYPES: [string, RegExp][] = [
   ["Para Piyasası", /PARA PIYASASI/], ["Fon Sepeti", /FON SEPETI/], ["Hisse Senedi", /HISSE SENEDI/],
   ["Kıymetli Maden", /\bALTIN\b|KIYMETLI MADEN|GUMUS/], ["Eurobond / Dış Borç.", /EUROBOND|DIS BORCLANMA/],
@@ -15,7 +18,7 @@ export function classify(name: string, kind: string) {
   const founder =
     kind === "EMK" ? name.match(/^(.+?A\.Ş\.)/)?.[1] : name.match(/^(.+?)\s+PORTF[ÖO]Y/i)?.[0];
   return {
-    founder: founder ?? name.split(" ")[0],
+    founder: (founder ?? name.split(" ")[0]).replace(/\s+/g, " "), // TEFAS adlarında çift boşluk olabiliyor (GARANTİ  PORTFÖY)
     type: TYPES.find(([, re]) => re.test(n))?.[0] ?? "Diğer",
     fx: /DOVIZ/.test(n),
     islamic: /KATILIM|KIRA SERTIFIKALARI/.test(n),

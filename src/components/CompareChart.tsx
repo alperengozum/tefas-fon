@@ -27,9 +27,9 @@ export default function CompareChart({ series }: { series: Series[] }) {
       <div className="h-72 sm:h-96">
         <ResponsiveContainer>
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} />
-            <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} width={50} />
+            <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-muted-foreground/30" />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" minTickGap={40} />
+            <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" width={50} />
             <Tooltip formatter={(v: number) => v.toFixed(2)} />
             <Legend formatter={(v: string) => <span title={names.get(v)}>{v}</span>} />
             {series.map((s, i) => <Line key={s.code} dataKey={s.code} stroke={COLORS[i % COLORS.length]} dot={false} connectNulls strokeWidth={1.8} isAnimationActive={false} />)}
