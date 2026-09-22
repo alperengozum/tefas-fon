@@ -118,8 +118,11 @@ export async function parsePdr(buf, expected) {
 async function discover(db, days) {
   for (let i = 0; i < days; i++) {
     const d = ymd(new Date(Date.now() - i * 864e5));
-    // son 2 gün her seferinde yeniden taranır (gün içinde yeni bildirim gelir)
-    if (i >= 2 && (await db.query("SELECT 1 FROM kap_scanned WHERE day=$1", [d])).rowCount) continue;
+    // son 2 gün her seferinde yeniden taranır (gün içinde yeni bildirim gelir); kap_notif_scanned kap_scanned'dan
+    // ayrı tutulur ki kap_notif eklendiğinde zaten kap_scanned'a düşmüş eski günler de bir kereliğine yeniden çekilip geriye dönük dolsun.
+    const pdrDone = i >= 2 && (await db.query("SELECT 1 FROM kap_scanned WHERE day=$1", [d])).rowCount;
+    const notifDone = i >= 2 && (await db.query("SELECT 1 FROM kap_notif_scanned WHERE day=$1", [d])).rowCount;
+    if (pdrDone && notifDone) continue;
     const list = await (await kap("api/disclosure/funds/byCriteria", { method: "POST", body: JSON.stringify({ fromDate: d, toDate: d, fundTypes: [], mkkMemberOid: null, disclosureClass: "", subjectList: [], index: "" }) })).json();
     const p = list.filter((x) => x.subject === "Portföy Dağılım Raporu" && x.fundCode);
     if (p.length)
@@ -134,6 +137,7 @@ async function discover(db, days) {
         `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO NOTHING`,
         [all.map((x) => x.disclosureIndex), all.map((x) => x.fundCode), all.map((x) => kapDate(x.publishDate)), all.map((x) => x.subject), all.map((x) => x.kapTitle)]);
     await db.query("INSERT INTO kap_scanned VALUES ($1) ON CONFLICT DO NOTHING", [d]);
+    await db.query("INSERT INTO kap_notif_scanned VALUES ($1) ON CONFLICT DO NOTHING", [d]);
   }
   return (await db.query("SELECT DISTINCT ON (code) code, disclosure_index, published::text AS published, rule, title FROM kap_pdr ORDER BY code, disclosure_index DESC")).rows;
 }

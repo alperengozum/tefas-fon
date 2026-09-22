@@ -27,5 +27,8 @@ CREATE TABLE IF NOT EXISTS fund_vol (code text PRIMARY KEY, vol double precision
 CREATE TABLE IF NOT EXISTS kap_notif (disclosure_index int PRIMARY KEY, code text NOT NULL, published timestamptz NOT NULL, subject text NOT NULL, name text);
 CREATE INDEX IF NOT EXISTS kap_notif_code ON kap_notif (code, published DESC);
 CREATE INDEX IF NOT EXISTS kap_notif_published ON kap_notif (published DESC);
+-- kap_scanned'dan ayrı: hangi günler kap_notif için tarandı (kap_notif sonradan eklendiği için kap_scanned'a düşmüş eski
+-- günlerin bir kereliğine yeniden çekilip geriye dönük dolmasını sağlar)
+CREATE TABLE IF NOT EXISTS kap_notif_scanned (day date PRIMARY KEY);
 -- benchmark günlük kapanışları (Yahoo Finance): BIST100 (puan), USD (USD/TRY), ALTIN (gram altın TL)
 CREATE TABLE IF NOT EXISTS bench (sym text NOT NULL, date date NOT NULL, price double precision NOT NULL, PRIMARY KEY (sym, date));
