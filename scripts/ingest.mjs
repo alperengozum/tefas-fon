@@ -98,7 +98,8 @@ const days = Number(process.argv[2] ?? 400);
 const today = new Date();
 for (const kind of KINDS) {
   const { rows: [{ max }] } = await db.query("SELECT max(date)::text FROM info WHERE kind=$1", [kind]);
-  let cur = max ? addDays(new Date(max), 1) : addDays(today, -days);
+  // son günü de yeniden çek: 10:00'da açıklamayan fonlar 12:00 turunda aynı tarihe eklensin (upsert)
+  let cur = max ? new Date(max) : addDays(today, -days);
   while (cur <= today) {
     const end = new Date(Math.min(addDays(cur, 27), today));
     const rows = await post("fonGnlBlgSiraliGetir", kind, cur, end);
