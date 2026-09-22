@@ -27,3 +27,6 @@ export const LABELS: Record<string, string> = {
   gsyy: "Girişim Sermayesi Yatırımı", t: "Türev", vint: "Vadeli İşlem Nakit Teminat", gas: "Gayrimenkul Sertifikası", d: "Diğer",
 };
 export const label = (k: string | null) => (k ? (LABELS[k] ?? k) : "–");
+
+// TEFAS henüz fiyat açıklamadıysa 0 gönderir
+export const price = (v: number | null | undefined) => (v == null ? "–" : v ? v.toFixed(4) : "Fiyat açıklanmadı");

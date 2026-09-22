@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
 import { fold } from "../lib/classify";
-import { label, pct, tl, tone } from "../lib/format";
+import { label, pct, price, tl, tone } from "../lib/format";
 import { useFavorites } from "../lib/favorites";
 import { FavStar } from "./FavStar";
 import { Input } from "./ui/input";
@@ -18,7 +18,7 @@ const F = (key: keyof Fund, head: string): Col => ({ key, head, fmt: tl, color: 
 const RISK: Col = { key: "risk", head: "Risk", fmt: (v) => v ?? "–" };
 const VIEWS: Record<string, { name: string; cols: Col[] }> = {
   getiri: { name: "Getiri", cols: [R("d1", "1G"), R("w1", "1H"), R("m1", "1A"), R("m3", "3A"), R("m6", "6A"), R("ytd", "YBB"), R("y1", "1Y"), R("y2", "2Y"), R("y3", "3Y"), R("y5", "5Y"), RISK] },
-  buyukluk: { name: "Büyüklük", cols: [{ key: "size", head: "Büyüklük", fmt: tl }, { key: "investors", head: "Yatırımcı", fmt: (v) => v?.toLocaleString("tr-TR") ?? "–" }, { key: "price", head: "Fiyat", fmt: (v) => v?.toFixed(4) ?? "–" }, RISK] },
+  buyukluk: { name: "Büyüklük", cols: [{ key: "size", head: "Büyüklük", fmt: tl }, { key: "investors", head: "Yatırımcı", fmt: (v) => v?.toLocaleString("tr-TR") ?? "–" }, { key: "price", head: "Fiyat", fmt: price }, RISK] },
   nakit: { name: "Nakit Giriş-Çıkışı", cols: [F("flow_w1", "1 Hafta"), F("flow_m1", "1 Ay"), F("flow_m3", "3 Ay"), { key: "size", head: "Büyüklük", fmt: tl }] },
 };
 const MAX_COMPARE = 10;
