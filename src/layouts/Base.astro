@@ -21,7 +21,7 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
       </div>
     )}
     <header class="no-print border-b">
-      <nav class="mx-auto flex max-w-[1700px] items-center gap-x-4 px-4 sm:flex-wrap sm:gap-x-6 sm:gap-y-1 py-3 text-sm">
+      <nav class="relative mx-auto flex max-w-[1700px] items-center gap-x-4 px-4 sm:flex-wrap sm:gap-x-6 sm:gap-y-1 py-3 text-sm">
         <a href="/" class="font-semibold">TEFAS Fon Analiz</a>
         <button
           id="nav-toggle"
@@ -33,12 +33,12 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
         </button>
-        <div id="nav-links" class="hidden w-full flex-col gap-2 sm:flex sm:w-auto sm:flex-row sm:items-center sm:gap-x-6 sm:gap-y-1">
+        <div id="nav-links" class="absolute inset-x-0 top-full z-40 hidden flex-col gap-1 border-b bg-background p-2 shadow-lg sm:static sm:z-auto sm:flex sm:w-auto sm:flex-row sm:items-center sm:gap-x-6 sm:gap-y-1 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
           {tabs.map(([k, l]) => (
-            <a href={`/fonlar/${k}`} class={path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
+            <a href={`/fonlar/${k}`} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
           ))}
           {[["/karsilastir", "Karşılaştır"], ["/hisse", "Hisse Ara"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"], ["/favoriler", "★ Favorilerim"]].map(([h, l]) => (
-            <a href={h} class={path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}>{l}</a>
+            <a href={h} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
           ))}
         </div>
       </nav>
