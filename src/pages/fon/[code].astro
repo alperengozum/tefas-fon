@@ -6,7 +6,7 @@ import FavButton from "../../components/FavStar";
 import { getBench, getFund, getFunds, getHoldings, getNews, overlapping, peers } from "../../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
 import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
-import { label, pct, tl, tone } from "../../lib/format";
+import { label, pct, price, tl, tone } from "../../lib/format";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
 if (!f) return new Response("Fon bulunamadı", { status: 404 });
@@ -43,7 +43,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
   </div>
 
   <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-    {[["Fiyat", last.price.toFixed(4)], ["Büyüklük", tl(last.size)], ["Yatırımcı", last.investors?.toLocaleString("tr-TR")], ["Pay sayısı", tl(last.shares).replace(" ₺", "")]].map(([k, v]) => (
+    {[["Fiyat", price(last.price)], ["Büyüklük", tl(last.size)], ["Yatırımcı", last.investors?.toLocaleString("tr-TR")], ["Pay sayısı", tl(last.shares).replace(" ₺", "")]].map(([k, v]) => (
       <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class="text-lg font-medium tabular-nums">{v}</div></div>
     ))}
   </div>
