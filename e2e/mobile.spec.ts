@@ -22,6 +22,9 @@ test("viewport meta initial-scale=1 içerir", async ({ page }) => {
 test("mobil: liste sayfası yatay taşmaz, gezinme ve filtreler ekrana sığar", async ({ page }) => {
   await list(page);
   await noPageScroll(page);
+  const menuButton = page.getByRole("button", { name: "Menü" });
+  await expect(menuButton).toBeVisible();
+  await menuButton.tap();
   for (const a of await page.locator("nav a").all()) {
     const b = (await a.boundingBox())!;
     expect(b.x).toBeGreaterThanOrEqual(0);
@@ -30,6 +33,19 @@ test("mobil: liste sayfası yatay taşmaz, gezinme ve filtreler ekrana sığar",
   const search = (await page.getByPlaceholder("Fon kodu veya adı…").boundingBox())!;
   expect(search.x + search.width).toBeLessThanOrEqual(375);
   expect(search.width).toBeGreaterThan(300); // tam genişlik
+});
+
+test("mobil: hamburger menü açılıp kapanır", async ({ page }) => {
+  await page.goto("/fonlar/yat");
+  const menuButton = page.getByRole("button", { name: "Menü" });
+  const links = page.locator("#nav-links");
+  await expect(links).toBeHidden();
+  await menuButton.tap();
+  await expect(links).toBeVisible();
+  await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+  await menuButton.tap();
+  await expect(links).toBeHidden();
+  await expect(menuButton).toHaveAttribute("aria-expanded", "false");
 });
 
 test("mobil: tablo kendi içinde yatay kaydırılır, sayfa değil", async ({ page }) => {
