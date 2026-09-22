@@ -13,9 +13,9 @@ export default function CompareChart({ series }: { series: Series[] }) {
   const byDate = new Map<string, Record<string, number>>();
   for (const s of series) {
     const h = s.history.filter((r) => r.date >= cut);
-    const base = h[0]?.price;
+    const base = h.find((r) => r.price)?.price;
     if (!base) continue;
-    for (const r of h) byDate.set(r.date, { ...byDate.get(r.date), [s.code]: (r.price / base) * 100 });
+    for (const r of h) if (r.price) byDate.set(r.date, { ...byDate.get(r.date), [s.code]: (r.price / base) * 100 });
   }
   const names = new Map(series.map((s) => [s.code, s.name]));
   const data = [...byDate].sort(([a], [b]) => (a < b ? -1 : 1)).map(([date, v]) => ({ date, ...v }));
