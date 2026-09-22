@@ -202,3 +202,8 @@ export const tickerFunds = cached(async (ticker: string): Promise<{ code: string
    WHERE h.ticker = $1 ORDER BY amount DESC NULLS LAST`,
   [ticker],
 )).rows, (t) => t);
+
+// Fonlarda geçen tüm hisse kodları (arama kutusunda öneri için)
+export const allTickers = cached(async (): Promise<string[]> =>
+  (await pool.query(`SELECT DISTINCT ticker FROM holdings ORDER BY ticker`)).rows.map((r) => r.ticker),
+() => "a");
