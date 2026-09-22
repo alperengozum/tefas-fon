@@ -43,8 +43,13 @@ Nakit akışı = pay sayısı değişimi × güncel fiyat (yaklaşık). Kategori
 ## Deploy (Coolify)
 `Dockerfile` + `start.sh`: konteyner şemayı hazırlar, ingest'i günlük döngüde arka planda çalıştırır (ilk açılışta ~20 dk backfill), web'i 4321'de sunar.
 Gerekli env: `DATABASE_URL` (Coolify Postgres iç adresi). Domain: `fon.yourapiservice.com` (Cloudflare A kaydı → sunucu IP'si, proxied).
+Opsiyonel env: `SHOW_DISCLAIMER=1` — header'da yatırım tavsiyesi değildir uyarısı gösterir (bkz. [Lisans](#lisans)); resmi dağıtımda (fon.yourapiservice.com) açık, varsayılan kapalı.
 
 ## E2E testler
 `npm run test:e2e` — Playwright (16 senaryo: liste filtre/sıralama/sekme, hisse filtresi, fon detay, karşılaştırma, `/api/holdings`). Yerel Postgres verisiyle build alıp 4322 portunda çalıştırır; ilk seferde `npx playwright install chromium-headless-shell`. Canlıya karşı: `E2E_BASE_URL=https://fon.yourapiservice.com npm run test:e2e`.
 
 CI: `.github/workflows/e2e.yml` her PR ve main push'unda Postgres servisi + `e2e/seed.sql` (sahte veri) ile çalışır.
+
+## Lisans
+[PolyForm Noncommercial 1.0.0](LICENSE) — ticari kullanım/satış yasak (kod, fork, türev fark etmez); kişisel/akademik/araştırma kullanımı serbest. Ticari kullanım için lisansörle iletişime geçin.
+Yatırım tavsiyesi değildir, veri sahipliği ve gizlilik notları için: [Kullanım Şartları ve Gizlilik](src/pages/kullanim-sartlari.astro) (`/kullanim-sartlari`), [LICENSE](LICENSE)'daki "Not Investment Advice; Data Disclaimer" bölümü.

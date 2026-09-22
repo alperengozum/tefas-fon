@@ -3,6 +3,7 @@ import "../styles/global.css";
 const { title = "TEFAS Fon Analiz" } = Astro.props;
 const tabs = [["yat", "Yatırım Fonları"], ["bes", "Emeklilik (BES)"], ["byf", "BYF"], ["gyf", "GYF"]];
 const path = Astro.url.pathname;
+const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
 ---
 <html lang="tr">
   <head>
@@ -13,6 +14,12 @@ const path = Astro.url.pathname;
     <slot name="head" />
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
+    {showDisclaimer && (
+      <div class="no-print border-b bg-amber-50 px-4 py-2 text-center text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        Bu site yatırım tavsiyesi değildir. Veriler TEFAS'ın kamuya açık API'sinden derlenmiştir, sitenin verisi değildir ve doğruluğu garanti edilmez; yatırım kararı vermeden önce resmi kaynakları kontrol edin.
+        <a href="/kullanim-sartlari" class="underline">Detaylar</a>
+      </div>
+    )}
     <header class="no-print border-b">
       <nav class="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-4 gap-y-1 px-4 sm:gap-x-6 py-3 text-sm">
         <a href="/" class="font-semibold">TEFAS Fon Analiz</a>
