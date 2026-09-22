@@ -1,35 +1,67 @@
-// SPK Kurul Bülteni ile toplu tasfiyeye çıkarılan fonlar: bu karar PYŞ'nin kendi KAP bildirimi değil, Kurul'un
-// doğrudan kararı olduğundan fon bazlı KAP akışında (holdings.mjs'nin taradığı funds/byCriteria) hiç görünmüyor
-// (örnek: THF + 130 fon, 17.09.2026 tarih 2026/60 sayılı Bülten — KAP'ta "Fon Tasfiye Duyurusu" bildirimi hiç yok).
-// Bülten metnindeki kod listesi elle buraya verilip kap_notif'e işlenir; aktif/pasif hesabı (db.ts) bunu otomatik okur.
-// kullanım: node scripts/kap-bulletin.mjs 2026-09-17 "BHN, BYZ, CBD, ..."
+// SPK Kurul Bülteni taraması: node scripts/kap-bulletin.mjs
+//
+// SPK'nın kendi kararıyla (PYŞ'nin kendi duyurusu değil) toplu tasfiyeye çıkardığı fonlar KAP'ın fon bazlı
+// bildirim akışında (holdings.mjs'nin taradığı funds/byCriteria) hiç görünmüyor — canlı KAP API'sine karşı
+// doğrulandı: THF + 130 fonun (17.09.2026, Kurul Bülteni 2026/60+61) hiçbirinde "tasfiye" geçen tek bildirim yok.
+// Karar SPK'nın kendi haftalık Kurul Bülteni'nde (spk.gov.tr) PDF olarak yayımlanıyor; ayrı bir kod (KOD) listesi
+// yerine sadece fon UNVANI geçiyor, bu yüzden TEFAS'taki bilinen fon adlarıyla (info tablosu) eşleştiriyoruz:
+// bültenin ilgili bölümünü ayrıştırmak yerine (sayfa düzeni/numaralama bültenden bültene değişebiliyor, kırılgan),
+// PDF metninde hangi bilinen fon adlarının (harfiyen) geçtiğine bakıyoruz — "tasfiye ettirilmesine" ibaresi
+// geçmeyen bültenlerde hiç aramıyoruz, o yüzden alakasız bültenlerde yanlış eşleşme riski yok.
 import pg from "pg";
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-const [date, codesArg] = process.argv.slice(2);
-if (!date || !codesArg) {
-  console.error('kullanım: node scripts/kap-bulletin.mjs 2026-09-17 "KOD1, KOD2, ..."');
-  process.exit(1);
+const HDR = { "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/146.0 Safari/537.36" };
+const squash = (s) => s.replace(/\s+/g, " ").trim();
+
+async function pdfText(buf) {
+  const doc = await getDocument({ data: new Uint8Array(buf), useSystemFonts: true, verbosity: 0 }).promise;
+  let out = "";
+  for (let p = 1; p <= doc.numPages; p++) out += " " + (await (await doc.getPage(p)).getTextContent()).items.map((it) => it.str).join(" ");
+  return squash(out);
 }
-const codes = [...new Set(codesArg.split(/[,\s]+/).map((c) => c.trim().toUpperCase()).filter(Boolean))];
 
-const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
-await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
-const { rows: known } = await db.query("SELECT DISTINCT ON (code) code, name FROM info ORDER BY code, date DESC");
-const names = new Map(known.map((r) => [r.code, r.name]));
-const missing = codes.filter((c) => !names.has(c));
-const found = codes.filter((c) => names.has(c));
-if (missing.length) console.log("TEFAS'ta bulunamayan kodlar (atlandı, yazım hatası olabilir):", missing.join(", "));
+async function main() {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
+  await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
 
-// disclosure_index KAP'ın kendi (pozitif) ID uzayıyla asla çakışmasın diye negatif; (tarih, kod) çiftinden türetilir
-// ki script tekrar çalıştırılınca (ON CONFLICT DO NOTHING) yinelenmesin.
-const idx = (c) => -parseInt(createHash("sha1").update(`bulletin:${date}:${c}`).digest("hex").slice(0, 7), 16);
+  // bülten listesi yıl başına ayrı sayfa; olası yıl geçişinde bir önceki yılın son bültenleri de hâlâ o sayfada kalabilir
+  const year = new Date().getFullYear();
+  const listHtml = await (await fetch(`https://spk.gov.tr/spk-bultenleri/${year}-yili-spk-bultenleri`, { headers: HDR })).text();
+  const bulletins = [...listHtml.matchAll(/href="(https:\/\/spk\.gov\.tr\/data\/[^"]+\/(\d{4}-\d+)\.pdf)"/g)]
+    .map((m) => ({ url: m[1], no: m[2] }));
+  if (!bulletins.length) { console.log("bülten listesi okunamadı ya da boş"); await db.end(); return; }
 
-if (found.length)
-  await db.query(
-    `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO NOTHING`,
-    [found.map(idx), found, found.map(() => `${date}T18:00:00+03:00`), found.map(() => "Fon Tasfiye Duyurusu"), found.map((c) => names.get(c))],
-  );
-console.log(`${found.length} fon kap_notif'e eklendi (Kurul Bülteni, ${date}).`);
-await db.end();
+  const { rows: scanned } = await db.query("SELECT no FROM spk_bulten_scanned");
+  const done = new Set(scanned.map((r) => r.no));
+  // son 2 bülten her seferinde yeniden taranır (yayınlandıktan sonra bir süre güncellenebiliyor, örn. "listesi güncellenmiştir")
+  const todo = bulletins.filter((b, i) => !done.has(b.no) || i < 2);
+  if (!todo.length) { console.log("yeni bülten yok"); await db.end(); return; }
+
+  const { rows: known } = await db.query("SELECT DISTINCT ON (code) code, name FROM info ORDER BY code, date DESC");
+  const names = known.map((r) => ({ code: r.code, name: squash(r.name) })).filter((r) => r.name.length > 8);
+
+  for (const b of todo) {
+    const buf = Buffer.from(await (await fetch(b.url, { headers: HDR })).arrayBuffer());
+    const text = await pdfText(buf);
+    if (/tasfiye ettirilmesine/i.test(text)) {
+      const dateM = text.match(/BÜLTENİ\s+\d{4}\/\d+\s+(\d{2}\/\d{2}\/\d{4})/);
+      const published = dateM ? dateM[1].split("/").reverse().join("-") + "T18:00:00+03:00" : new Date().toISOString();
+      const matched = names.filter((r) => text.includes(r.name));
+      if (matched.length) {
+        const base = -(parseInt(b.no.replace("-", ""), 10) * 1000);
+        await db.query(
+          `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO NOTHING`,
+          [matched.map((_, i) => base - i), matched.map((r) => r.code), matched.map(() => published), matched.map(() => "Fon Tasfiye Duyurusu"), matched.map((r) => r.name)],
+        );
+        console.log(`bülten ${b.no}: ${matched.length} fon tasfiye olarak işlendi (${matched.map((r) => r.code).join(", ")})`);
+      } else {
+        console.log(`bülten ${b.no}: "tasfiye ettirilmesine" geçiyor ama bilinen fon adıyla eşleşme yok, elle kontrol edin: ${b.url}`);
+      }
+    }
+    await db.query("INSERT INTO spk_bulten_scanned VALUES ($1) ON CONFLICT DO NOTHING", [b.no]);
+  }
+  await db.end();
+}
+await main();
