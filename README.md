@@ -52,4 +52,4 @@ CI: `.github/workflows/e2e.yml` her PR ve main push'unda Postgres servisi + `e2e
 
 ## Lisans
 [PolyForm Noncommercial 1.0.0](LICENSE) — ticari kullanım/satış yasak (kod, fork, türev fark etmez); kişisel/akademik/araştırma kullanımı serbest. Ticari kullanım için lisansörle iletişime geçin.
-Yatırım tavsiyesi değildir, veri sahipliği ve gizlilik notları için: [Kullanım Şartları ve Gizlilik](src/pages/kullanim-sartlari.astro) (`/kullanim-sartlari`), [LICENSE](LICENSE)'daki "Not Investment Advice; Data Disclaimer" bölümü.
+Yatırım tavsiyesi değildir ve veri sahipliği notları için: [Terms](src/pages/terms.astro) (`/terms`), gizlilik için [Privacy Policy](src/pages/privacy-policy.astro) (`/privacy-policy`) — her sayfanın altbilgisinde bağlantılar var. [LICENSE](LICENSE)'daki "Not Investment Advice; Data Disclaimer" bölümü de aynı konuyu kapsar.

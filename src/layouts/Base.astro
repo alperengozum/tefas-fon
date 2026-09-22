@@ -17,7 +17,7 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
     {showDisclaimer && (
       <div class="no-print border-b bg-amber-50 px-4 py-2 text-center text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200">
         Bu site yatırım tavsiyesi değildir. Veriler TEFAS'ın kamuya açık API'sinden derlenmiştir, sitenin verisi değildir ve doğruluğu garanti edilmez; yatırım kararı vermeden önce resmi kaynakları kontrol edin.
-        <a href="/kullanim-sartlari" class="underline">Detaylar</a>
+        <a href="/terms" class="underline">Detaylar</a>
       </div>
     )}
     <header class="no-print border-b">
@@ -32,5 +32,12 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
       </nav>
     </header>
     <main class="mx-auto max-w-[1700px] px-3 py-4 sm:px-4 sm:py-6"><slot /></main>
+    <footer class="no-print border-t mt-8 px-4 py-4 text-center text-xs text-muted-foreground">
+      <a href="/terms" class="hover:text-foreground">Terms</a>
+      <span class="mx-2">·</span>
+      <a href="/privacy-policy" class="hover:text-foreground">Privacy Policy</a>
+      <span class="mx-2">·</span>
+      <a href="https://github.com/alperengozum/tefas-fon/blob/main/LICENSE" target="_blank" rel="noopener" class="hover:text-foreground">License</a>
+    </footer>
   </body>
 </html>
