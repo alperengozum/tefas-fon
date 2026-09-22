@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { beta, corr, dailyReturns, overlap, rolling, simulate, xirr } from "../src/lib/stats.ts";
+import { ret } from "../src/lib/analytics.ts";
 
 const series = (n, f, start = "2025-01-01") => Array.from({ length: n }, (_, i) => ({ date: new Date(Date.parse(start) + i * 864e5).toISOString().slice(0, 10), price: f(i) }));
 
@@ -10,6 +11,11 @@ test("fiyat 0 (açıklanmadı) günleri -100% getiri üretmez", () => {
   assert.equal(rolling(h, 30).min, 0);
   assert.ok(![...dailyReturns(h, "2025-01-01").values()].includes(-1));
   assert.equal(simulate(h, 1000, "2025-01-01", "2025-04-30"), null);
+});
+
+test("ret: referans gün fiyatı 0 ise önceki açıklanmış fiyat kullanılır", () => {
+  const h = series(20, (i) => (i === 12 ? 0 : 100 + i));
+  assert.equal(ret(h, 7), (119 / 111 - 1) * 100); // 7 gün önce (i=12) 0 -> i=11
 });
 
 test("korelasyon ve beta: b = 2x getirili seri", () => {
