@@ -102,6 +102,26 @@ any warranty or condition, and the licensor will not be liable
 to you for any damages arising out of these terms or the use
 or nature of the software, under any kind of legal claim.***
 
+## Not Investment Advice; Data Disclaimer
+
+The software and any output it produces (prices, returns, rankings,
+charts, comparisons, or any other figures) are provided for
+informational purposes only and do not constitute investment advice,
+a recommendation, or a solicitation to buy or sell any financial
+instrument. Nothing in the software should be relied upon for making
+investment decisions; consult a licensed financial advisor and
+official sources before doing so.
+
+The underlying data is not owned by the licensor. It is compiled
+and reformatted from data already publicly available through
+third-party sources (including public government/regulatory APIs).
+The licensor makes no claim of ownership over that underlying data
+and gives no warranty as to its accuracy, completeness, or
+timeliness. Any redistribution of that underlying data is your own
+responsibility; the licensor does not grant, and this license does
+not imply, any right to redistribute the underlying third-party
+data itself, as distinct from the software's source code.
+
 ## Definitions
 
 The **licensor** is the individual or entity offering these
