@@ -114,7 +114,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
       <ul class="space-y-2 text-sm">
         {news.map((n) => (
           <li>
-            <a class="hover:underline" href={`https://www.kap.org.tr/tr/Bildirim/${n.disclosure_index}`} target="_blank" rel="noopener noreferrer">
+            <a class="hover:underline" href={n.url ?? `https://www.kap.org.tr/tr/Bildirim/${n.disclosure_index}`} target="_blank" rel="noopener noreferrer">
               <div class="font-medium">{n.subject}</div>
               <div class="text-xs text-muted-foreground">{new Date(n.published).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}</div>
             </a>
