@@ -33,7 +33,10 @@ async function main() {
     .map((m) => ({ url: m[1], no: m[2] }));
   if (!bulletins.length) { console.log("bülten listesi okunamadı ya da boş"); await db.end(); return; }
 
-  const { rows: scanned } = await db.query("SELECT no FROM spk_bulten_scanned");
+  // url kolonu sonradan eklendi: fonu eşleşmiş ama url'i boş kalmış bültenler bir kereliğine yeniden taranır
+  const { rows: scanned } = await db.query(
+    `SELECT no FROM spk_bulten_scanned s WHERE NOT EXISTS (SELECT 1 FROM kap_notif WHERE url IS NULL
+       AND disclosure_index BETWEEN -replace(s.no, '-', '')::int * 1000 - 999 AND -replace(s.no, '-', '')::int * 1000)`);
   const done = new Set(scanned.map((r) => r.no));
   // son 2 bülten her seferinde yeniden taranır (yayınlandıktan sonra bir süre güncellenebiliyor, örn. "listesi güncellenmiştir")
   const todo = bulletins.filter((b, i) => !done.has(b.no) || i < 2);
@@ -52,8 +55,8 @@ async function main() {
       if (matched.length) {
         const base = -(parseInt(b.no.replace("-", ""), 10) * 1000);
         await db.query(
-          `INSERT INTO kap_notif SELECT * FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO NOTHING`,
-          [matched.map((_, i) => base - i), matched.map((r) => r.code), matched.map(() => published), matched.map(() => "Fon Tasfiye Duyurusu"), matched.map((r) => r.name)],
+          `INSERT INTO kap_notif SELECT *, $6 FROM unnest($1::int[], $2::text[], $3::timestamptz[], $4::text[], $5::text[]) ON CONFLICT (disclosure_index) DO UPDATE SET url = EXCLUDED.url`,
+          [matched.map((_, i) => base - i), matched.map((r) => r.code), matched.map(() => published), matched.map(() => "Fon Tasfiye Duyurusu"), matched.map((r) => r.name), b.url],
         );
         console.log(`bülten ${b.no}: ${matched.length} fon tasfiye olarak işlendi (${matched.map((r) => r.code).join(", ")})`);
       } else {
