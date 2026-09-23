@@ -27,10 +27,10 @@ const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
 ---
 <Base title="Fon Karşılaştırma · TEFAS Fon Analiz">
   <h1 class="mb-4 text-xl font-semibold">Fon Karşılaştırma</h1>
-  <form class="mb-6 flex flex-wrap items-start gap-3" method="get">
+  <form class="mb-6 flex flex-wrap items-end gap-3" method="get">
     <FundPicker client:only="react" name="codes" initial={codes} max={10} />
     <button class="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground">Karşılaştır</button>
-    <label class="flex items-center gap-1 self-center text-sm"><input type="checkbox" name="endeks" value="1" checked={endeks} /> BIST100 / USD / altın ekle</label>
+    <label class="flex h-8 items-center gap-1 text-sm"><input type="checkbox" name="endeks" value="1" checked={endeks} /> BIST100 / USD / altın ekle</label>
   </form>
   {funds.length === 0 ? <p class="text-muted-foreground">Fon listesinden kutucukları işaretleyin ya da yukarıdan fon seçin.</p> : (
     <>
