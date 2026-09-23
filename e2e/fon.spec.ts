@@ -280,15 +280,15 @@ test("simülasyon: çoklu fon seçici çip ekler/çıkarır, form ?codes= gönde
   await expect(page.locator("tbody tr").first()).toContainText(codes[0]);
 });
 
-test("favoriler: listede yıldızla ekle, /favoriler'de görün, detayda çıkar", async ({ page }) => {
+test("pin: listede pinlenen fon en üste çıkar, yenilemede kalır, detayda kaldırılır", async ({ page }) => {
   await ready(page);
-  const code = await codeAt(page);
-  await rows(page).first().getByRole("button", { name: "Favorilere ekle" }).click();
-  await page.goto("/favoriler");
-  await expect(rows(page)).toHaveCount(1);
+  const code = await codeAt(page, 2);
+  await rows(page).nth(2).getByRole("button", { name: "Listede en üste pinle" }).click();
+  await expect(rows(page).first().locator("td").nth(1)).toHaveText(code);
+  await ready(page); // localStorage'dan geri yüklenir
   await expect(rows(page).first().locator("td").nth(1)).toHaveText(code);
   await page.goto(`/fon/${code}`);
-  await page.getByRole("button", { name: "Favorilerden çıkar" }).click();
-  await page.goto("/favoriler");
-  await expect(page.getByText("Henüz favori fon yok")).toBeVisible();
+  await page.getByRole("button", { name: "Pini kaldır" }).click();
+  await ready(page);
+  await expect(rows(page).first().locator("td").nth(1)).not.toHaveText(code);
 });

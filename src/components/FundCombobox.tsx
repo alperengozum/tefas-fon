@@ -5,7 +5,7 @@ import { decodeFunds } from "../lib/compact";
 
 export type Opt = { value: string; label: string; price: number };
 
-// Tüm fonlar: favoriler sayfasıyla aynı, önbelleklenebilir JSON (sayfa başına bir kez indirilir)
+// Tüm fonlar: önbelleklenebilir JSON (sayfa başına bir kez indirilir)
 let cache: Promise<Opt[]> | null = null;
 export function useFundOptions(): Opt[] {
   const [opts, set] = useState<Opt[]>([]);

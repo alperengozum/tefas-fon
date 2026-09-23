@@ -2,7 +2,7 @@
 import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
-import FavButton from "../../components/FavStar";
+import PinButton from "../../components/PinButton";
 import { getBench, getFund, getFunds, getHoldings, getNews, overlapping, peers } from "../../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
 import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
@@ -38,7 +38,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
     <div class="text-sm text-muted-foreground">{f.kind} · {trDate(last.date)} · {f.active ? "TEFAS'ta aktif" : <span class="font-medium text-red-600">TEFAS'ta pasif {f.tasfiye ? `(tasfiye duyurusu: ${trDate(f.tasfiye)})` : `(son veri ${trDate(last.date)})`}</span>}</div>
     <h1 class="break-words text-xl font-semibold sm:text-2xl">{f.code} <span class="text-base font-normal sm:text-lg text-muted-foreground">{f.name}</span></h1>
     <a class="no-print text-sm underline" href={`/karsilastir?codes=${f.code}`}>Karşılaştırmaya ekle</a>
-    <span class="no-print mx-1 text-muted-foreground">·</span><span class="no-print"><FavButton client:only="react" code={f.code} /></span>
+    <span class="no-print mx-1 text-muted-foreground">·</span><span class="no-print"><PinButton client:only="react" code={f.code} /></span>
     <span class="no-print mx-1 text-muted-foreground">·</span><button type="button" class="no-print text-sm underline" onclick="window.print()">PDF olarak indir</button>
   </div>
 

@@ -7,7 +7,7 @@ const KINDS: Record<string, string> = { yat: "YAT", bes: "EMK", byf: "BYF", gyf:
 // Liste verisi HTML'e gömülmek yerine ayrı, önbelleklenebilir JSON: sayfa kabuğu küçülür, veri Cloudflare'de tutulur.
 // Cache-Control middleware'de. ETag: veri tarihi + uzunluk (günde bir değişir), yenilemede 304 döner.
 export const GET: APIRoute = async ({ params, request }) => {
-  // "all": tüm türler (favoriler sayfası). ponytail: her istekte yeniden kodlanır (~ms); yavaşlarsa birleşik diziyi önbelleğe al
+  // "all": tüm türler (fon seçici). ponytail: her istekte yeniden kodlanır (~ms); yavaşlarsa birleşik diziyi önbelleğe al
   const kinds = params.tur === "all" ? Object.values(KINDS) : [KINDS[params.tur ?? ""]];
   if (!kinds[0]) return new Response(null, { status: 404 });
   const parts = await Promise.all(kinds.map(listFunds));

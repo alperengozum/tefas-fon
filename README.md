@@ -17,7 +17,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
 - **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans. Adresi paylaşılabilir
 - **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı
-- **Favoriler**: tarayıcıda saklanan favori fon listesi
+- **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
 
@@ -101,7 +101,6 @@ npm run dev          # http://localhost:4321
 - `/hisse` ve `/hisse/TICKER`: hisseyi tutan fonlar
 - `/portfoy?f=AFT:tl:5000&f=TCD:adet:120`: paylaşılabilir portföy, ayrıca localStorage'a kaydedilir
 - `/simulasyon?codes=AFT&monthly=5000&start=2025-09-21`: alım simülasyonu
-- `/favoriler`: favori fonlar
 
 ## Hesaplama notları
 
