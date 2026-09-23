@@ -6,7 +6,7 @@ import FavButton from "../../components/FavStar";
 import { getBench, getFund, getFunds, getHoldings, getNews, overlapping, peers } from "../../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
 import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
-import { label, pct, price, tl, tone } from "../../lib/format";
+import { label, pct, price, tl, tone, trDate } from "../../lib/format";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
 if (!f) return new Response("Fon bulunamadı", { status: 404 });
@@ -35,7 +35,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 ---
 <Base title={`${f.code} · TEFAS Fon Analiz`}>
   <div class="mb-6">
-    <div class="text-sm text-muted-foreground">{f.kind} · {last.date} · {f.active ? "TEFAS'ta aktif" : <span class="font-medium text-red-600">TEFAS'ta pasif {f.tasfiye ? `(tasfiye duyurusu: ${f.tasfiye.slice(0, 10)})` : `(son veri ${last.date})`}</span>}</div>
+    <div class="text-sm text-muted-foreground">{f.kind} · {trDate(last.date)} · {f.active ? "TEFAS'ta aktif" : <span class="font-medium text-red-600">TEFAS'ta pasif {f.tasfiye ? `(tasfiye duyurusu: ${trDate(f.tasfiye)})` : `(son veri ${trDate(last.date)})`}</span>}</div>
     <h1 class="break-words text-xl font-semibold sm:text-2xl">{f.code} <span class="text-base font-normal sm:text-lg text-muted-foreground">{f.name}</span></h1>
     <a class="no-print text-sm underline" href={`/karsilastir?codes=${f.code}`}>Karşılaştırmaya ekle</a>
     <span class="no-print mx-1 text-muted-foreground">·</span><span class="no-print"><FavButton client:only="react" code={f.code} /></span>
@@ -94,7 +94,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 
   {holdings.length > 0 && (
     <section class="mb-8">
-      <h2 class="mb-3 font-semibold">Hisse portföyü <span class="text-xs font-normal text-muted-foreground">KAP Portföy Dağılım Raporu · {report} · yayın {published} · portföy değerine oran</span></h2>
+      <h2 class="mb-3 font-semibold">Hisse portföyü <span class="text-xs font-normal text-muted-foreground">KAP Portföy Dağılım Raporu · {report} · yayın {trDate(published)} · portföy değerine oran</span></h2>
       <div class="grid gap-x-8 gap-y-1.5 text-sm md:grid-cols-2">
         {holdings.map((h) => (
           <div>
@@ -116,7 +116,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
           <li>
             <a class="hover:underline" href={`https://www.kap.org.tr/tr/Bildirim/${n.disclosure_index}`} target="_blank" rel="noopener noreferrer">
               <div class="font-medium">{n.subject}</div>
-              <div class="text-xs text-muted-foreground">{new Date(n.published).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" })}</div>
+              <div class="text-xs text-muted-foreground">{trDate(n.published)} {n.published.slice(11, 16)}</div>
             </a>
           </li>
         ))}
@@ -133,7 +133,7 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 
   <div class="grid gap-8 md:grid-cols-2">
     <section>
-      <h2 class="mb-3 font-semibold">Varlık dağılımı <span class="text-xs font-normal text-muted-foreground">{f.allocDate}{f.allocKap && " · KAP rapor dönemi sonu"}</span></h2>
+      <h2 class="mb-3 font-semibold">Varlık dağılımı <span class="text-xs font-normal text-muted-foreground">{f.allocDate && trDate(f.allocDate)}{f.allocKap && " · KAP rapor dönemi sonu"}</span></h2>
       {alloc.length === 0 ? <p class="text-sm text-muted-foreground">Veri yok.</p> : (
         <ul class="space-y-1.5 text-sm">
           {alloc.map(([k, v]) => (

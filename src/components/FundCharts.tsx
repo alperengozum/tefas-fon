@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Button } from "./ui/button";
-import { tl } from "../lib/format";
+import { tl, trDate } from "../lib/format";
 
 type H = { date: string; price: number; size: number; investors: number }[];
 const RANGES: [string, number][] = [["1A", 30], ["3A", 91], ["6A", 182], ["1Y", 365]];
@@ -26,9 +26,9 @@ export default function FundCharts({ history }: { history: H }) {
         <ResponsiveContainer>
           <AreaChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-muted-foreground/30" />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" minTickGap={40} />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" minTickGap={40} tickFormatter={trDate} />
             <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" tickFormatter={(v) => fmt(v)} width={70} />
-            <Tooltip formatter={(v: number) => fmt(v)} />
+            <Tooltip labelFormatter={trDate} formatter={(v: number) => fmt(v)} />
             <Area type="monotone" dataKey={metric} name={METRICS[metric][0]} stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} dot={false} connectNulls isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>

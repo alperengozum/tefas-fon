@@ -30,3 +30,6 @@ export const label = (k: string | null) => (k ? (LABELS[k] ?? k) : "–");
 
 // TEFAS henüz fiyat açıklamadıysa 0 gönderir
 export const price = (v: number | null | undefined) => (v == null ? "–" : v ? v.toFixed(4) : "Fiyat açıklanmadı");
+
+// "2026-09-22..." -> "22-09-2026"
+export const trDate = (d: string | null | undefined) => (d ? d.slice(0, 10).split("-").reverse().join("-") : "–");
