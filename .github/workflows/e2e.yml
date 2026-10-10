@@ -18,8 +18,8 @@ jobs:
     env:
       DATABASE_URL: postgres://tefas:tefas@localhost:5432/tefas
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx playwright install --with-deps chromium-headless-shell
@@ -29,6 +29,6 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f e2e/seed.sql
           node scripts/ingest.mjs vol
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with: { name: playwright-results, path: test-results, retention-days: 7 }
