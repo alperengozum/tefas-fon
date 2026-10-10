@@ -1,8 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
-import { decodeFunds } from "../lib/compact";
+import { decodeList } from "../lib/compact";
+import { inBase, PERIOD_DAYS } from "../lib/analytics";
 import { fold } from "../lib/classify";
 import { download, toCsv, today } from "../lib/csv";
+import { EMPTY, fromQuery, toQuery } from "../lib/listUrl";
 import { type AssetRule, assetName, assetOptions, matches, ruleText, share } from "../lib/assets";
 import { pct, price, tl, tone } from "../lib/format";
 import { usePins } from "../lib/pins";
@@ -32,7 +34,6 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
   { key: "qualified", name: "Nitelikli / Özel" }, { key: "oks", name: "OKS" },
 ];
 
-const EMPTY = { q: "", status: "aktif", type: "", founder: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "", assets: [] as AssetRule[] };
 // "Tüm Filtreler" paneli kapalıyken de kaç filtrenin açık olduğu görünsün
 const PANEL = ["riskMin", "riskMax", "invMin", "invMax", "sizeMin", "sizeMax", "stockMin"] as const;
 // Sıralama anahtarı: Fund alanı veya "@<varlık>" (varlık kuralı sütunu, ör. "@g:mevduat")
@@ -64,24 +65,35 @@ export default function FundTable({ src }: { src: string }) {
 }
 
 function FundTableView({ data }: { data: string }) {
-  const funds = useMemo(() => decodeFunds(data), [data]);
+  const list = useMemo(() => decodeList(data), [data]);
+  // TL / USD: USD seçiliyken getiri alanları USD/TRY'nin aynı vadeli getirisine göre çevrilir (sıralama ve filtre de çevrilmiş değerle)
+  const [ccy, setCcy] = useState<"TL" | "USD">("TL");
+  const funds = useMemo(() => {
+    const usd = list.usd;
+    if (ccy === "TL" || !usd) return list.funds;
+    return list.funds.map((x) => ({ ...x, ...Object.fromEntries(PERIOD_DAYS.map(([k]) => [k, inBase(x[k as keyof Fund] as number | null, usd[k])])) }));
+  }, [list, ccy]);
   const { pins, toggle } = usePins();
-  const [view, setView] = useState("getiri");
-  const [f, setF] = useState(EMPTY);
+  // Filtre, görünüm ve sıralama adresten başlar ve adrese yazılır (paylaşılabilir liste; bkz. lib/listUrl)
+  const [init] = useState(() => fromQuery(location.search, Object.keys(VIEWS)));
+  const [view, setView] = useState(init.view);
+  const [f, setF] = useState(init.f);
   const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "size", dir: -1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>(init.sort as { key: SortKey; dir: 1 | -1 });
+  useEffect(() => {
+    const q = toQuery({ f, view, sort });
+    history.replaceState(history.state, "", q ? `${location.pathname}?${q}` : location.pathname);
+  }, [f, view, sort]);
+  const [copied, setCopied] = useState(false);
+  const copyLink = () => navigator.clipboard?.writeText(location.href).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
   // varlık kuralı taslağı (Ekle'ye basılınca f.assets'e geçer)
   const [draft, setDraft] = useState({ a: "", op: "has" as AssetRule["op"], min: "" });
   const [limit, setLimit] = useState(100);
   // Sonsuz kaydırma: tablonun altındaki gözcü görününce +100 satır daha çiz
   const end = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  // Hisse filtresi (KAP portföy raporu): ?hisse=EREGL ile de açılır
+  // Hisse filtresi (KAP portföy raporu): ?hisse=EREGL ile de açılır (fromQuery)
   const [byStock, setByStock] = useState<Record<string, number> | null>(null);
-  useEffect(() => {
-    const q = new URLSearchParams(location.search).get("hisse");
-    if (q) set({ stock: q.toUpperCase(), stockW: "1" });
-  }, []);
   useEffect(() => {
     const t = f.stock.trim().toUpperCase();
     if (t.length < 2) return setByStock(null);
@@ -190,6 +202,7 @@ function FundTableView({ data }: { data: string }) {
           </Button>
         ))}
         {active && <Button size="sm" variant="ghost" onClick={() => setF(EMPTY)}>Temizle</Button>}
+        <Button size="sm" variant="ghost" onClick={copyLink} title="Filtre, görünüm ve sıralamayla bu listenin bağlantısı">{copied ? "Kopyalandı" : "Linki kopyala"}</Button>
         {picked.length > 0 && (
           <Button className="ml-auto" onClick={() => (location.href = `/karsilastir?codes=${picked.join(",")}`)}>Karşılaştır ({picked.length})</Button>
         )}
@@ -243,8 +256,16 @@ function FundTableView({ data }: { data: string }) {
         <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
           <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
         </Tabs>
+        {list.usd && view !== "buyukluk" && view !== "nakit" && (
+          <div className="flex rounded-md border p-0.5" role="group" aria-label="Getiri para birimi">
+            {(["TL", "USD"] as const).map((c) => (
+              <Button key={c} size="sm" variant={ccy === c ? "default" : "ghost"} aria-pressed={ccy === c} onClick={() => setCcy(c)}>{c === "TL" ? "TL getiri" : "USD bazında"}</Button>
+            ))}
+          </div>
+        )}
         <Button size="sm" variant="outline" className="ml-auto" onClick={exportCsv} disabled={!rows.length} title="Filtrelenmiş tüm satırlar, açık görünümün sütunlarıyla">CSV indir ({rows.length})</Button>
       </div>
+      {ccy === "USD" && view !== "buyukluk" && view !== "nakit" && <p className="text-xs text-muted-foreground" data-testid="usd-not">Getiriler USD bazında: (1 + TL getiri) / (1 + USD/TRY getirisi) − 1. Dolar bazında kazandı mı sorusunun cevabı.</p>}
 
       {view === "nakit" && byCat.length > 0 && (
         <div className="flex flex-wrap gap-2 text-xs">

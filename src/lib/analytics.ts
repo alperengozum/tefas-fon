@@ -24,3 +24,10 @@ export const RETURNS: [string, number | "ytd"][] = [["1H", 7], ["1A", 30], ["3A"
 
 // Benchmark seri kodları (bench tablosundaki sym) ve görünen adları
 export const BENCH: [string, string][] = [["BIST100", "BIST 100"], ["USD", "USD/TRY"], ["ALTIN", "Gram altın"]];
+
+// Getiriyi başka bir varlık cinsinden ifade et (%): TL getirisi r, USD/TRY getirisi b -> USD bazında (1+r)/(1+b) - 1
+export const inBase = (r: number | null | undefined, b: number | null | undefined) =>
+  r == null || b == null || !isFinite(r) || !isFinite(b) ? null : ((1 + r / 100) / (1 + b / 100) - 1) * 100;
+
+// Liste getiri anahtarı -> gün (db.ts PERIODS ile aynı vadeler; ytd ayrı)
+export const PERIOD_DAYS: [string, number | "ytd"][] = [["d1", 1], ["w1", 7], ["m1", 30], ["m3", 91], ["m6", 182], ["ytd", "ytd"], ["y1", 365], ["y2", 730], ["y3", 1095], ["y5", 1825]];
