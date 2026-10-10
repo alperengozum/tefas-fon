@@ -308,8 +308,8 @@ test("portföy: hedef % ile yeniden dengeleme ve portföy riski", async ({ page 
   await expect(risk.getByText("Volatilite (yıllık)")).toBeVisible();
   await expect(page.locator("thead th", { hasText: "Risk katkısı" })).toBeVisible();
   const reb = page.locator('[data-section="dengeleme"]');
-  await expect(reb.locator("tr", { hasText: "AAA" })).toContainText("Sat 2 B ₺");
-  await expect(reb.locator("tr", { hasText: "BBB" })).toContainText("Al 2 B ₺");
+  await expect(reb.locator("tr", { hasText: "AAA" })).toContainText("Sat 2.000 ₺");
+  await expect(reb.locator("tr", { hasText: "BBB" })).toContainText("Al 2.000 ₺");
   await expect(reb.locator("tbody tr").first().locator("td").last()).toHaveText("50.0%");
   // satış yapmadan + ek nakit: formdan gönder
   await page.getByLabel("Ek nakit (₺)").fill("1000");
@@ -318,7 +318,7 @@ test("portföy: hedef % ile yeniden dengeleme ve portföy riski", async ({ page 
   await expect(page).toHaveURL(/nakit=1000.*satma=1/);
   await expect(page.getByLabel("Hedef % 1")).toHaveValue("50");
   await expect(reb.locator("tr", { hasText: "AAA" })).toContainText("–"); // fazla olana dokunulmaz
-  await expect(reb.locator("tr", { hasText: "BBB" })).toContainText("Al 1 B ₺");
+  await expect(reb.locator("tr", { hasText: "BBB" })).toContainText("Al 1.000 ₺");
 });
 
 test("simülasyon: çoklu fon seçici çip ekler/çıkarır, form ?codes= gönderir", async ({ page, request }) => {

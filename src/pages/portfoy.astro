@@ -69,6 +69,8 @@ for (const e of entered) if (e.target) targets.set(e.code, (targets.get(e.code) 
 const trades = targets.size ? rebalance(funds.map((f) => ({ code: f.code, value: amounts.get(f.code)!, target: targets.get(f.code) ?? 0 })), cash, noSell) : [];
 const targetSum = [...targets.values()].reduce((s, v) => s + v, 0);
 const afterTotal = total + cash;
+// al/sat emri için tam tutar (tl() "1,5 B" gibi yuvarlar, 1.500 ₺ "2 B ₺" görünürdü)
+const exact = (v: number) => `${Math.round(v).toLocaleString("tr-TR")} ₺`;
 ---
 <Base title="Portföyüm · TEFAS Fon Analiz">
   <h1 class="mb-1 text-xl font-semibold">Portföyüm</h1>
@@ -114,8 +116,8 @@ const afterTotal = total + cash;
             <table class="w-full text-sm tabular-nums">
               <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Şu an</th><th class="p-2">Pay</th><th class="p-2">Hedef</th><th class="p-2">İşlem</th><th class="p-2">Sonra</th><th class="p-2">Sonra pay</th></tr></thead>
               <tbody>{trades.map((t) => (
-                <tr class="border-t"><td class="p-2 text-left font-medium">{t.code}</td><td class="p-2 text-right">{tl(t.value)}</td><td class="p-2 text-right">{(w(t.code) * 100).toFixed(1)}%</td><td class="p-2 text-right">{t.target.toFixed(1)}%</td>
-                  <td class={`p-2 text-right font-medium ${tone(t.amount)}`}>{Math.abs(t.amount) < 1 ? "–" : `${t.amount > 0 ? "Al" : "Sat"} ${tl(Math.abs(t.amount))}`}</td><td class="p-2 text-right">{tl(t.after)}</td><td class="p-2 text-right">{((t.after / afterTotal) * 100).toFixed(1)}%</td></tr>
+                <tr class="border-t"><td class="p-2 text-left font-medium">{t.code}</td><td class="p-2 text-right">{exact(t.value)}</td><td class="p-2 text-right">{(w(t.code) * 100).toFixed(1)}%</td><td class="p-2 text-right">{t.target.toFixed(1)}%</td>
+                  <td class={`p-2 text-right font-medium ${tone(t.amount)}`}>{Math.abs(t.amount) < 1 ? "–" : `${t.amount > 0 ? "Al" : "Sat"} ${exact(Math.abs(t.amount))}`}</td><td class="p-2 text-right">{exact(t.after)}</td><td class="p-2 text-right">{((t.after / afterTotal) * 100).toFixed(1)}%</td></tr>
               ))}</tbody>
             </table>
           </div>
