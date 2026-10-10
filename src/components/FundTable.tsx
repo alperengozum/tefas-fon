@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
 import { fold } from "../lib/classify";
+import { download, toCsv, today } from "../lib/csv";
 import { type AssetRule, assetName, assetOptions, matches, ruleText, share } from "../lib/assets";
 import { pct, price, tl, tone } from "../lib/format";
 import { usePins } from "../lib/pins";
@@ -141,6 +142,17 @@ function FundTableView({ data }: { data: string }) {
   // "içersin" kuralları tabloda sıralanabilir % sütunu olur
   const assetCols = f.assets.filter((r) => r.op === "has");
   const panelOn = PANEL.filter((k) => f[k]).length + f.assets.length;
+  // CSV: filtrelenmiş ve sıralanmış tüm satırlar (ekrandaki 100 satır sınırı değil); ham sayılar (yüzde/₺ işareti yok)
+  const exportCsv = () => {
+    const extra = [
+      ...(stockCol.length ? [[`${f.stock.toUpperCase()} ağırlık %`, (x: Fund) => byStock?.[x.code]] as const] : []),
+      ...assetCols.map((r) => [`${assetName(r.a)} %`, (x: Fund) => (x.alloc ? share(x.alloc, r.a) : null)] as const),
+      ...cols.map((c) => [c.fmt === pct ? `${c.head} %` : c.head, (x: Fund) => x[c.key] as number | null] as const),
+    ];
+    const headers = ["Kod", "Fon", "Tür", "Kurucu", "Durum", "Fiyat", "Büyüklük (₺)", "Yatırımcı", ...extra.map(([h]) => h)];
+    const data = rows.map((x) => [x.code, x.name, x.type, x.founder, x.active ? "aktif" : "pasif", x.price || null, x.size, x.investors, ...extra.map(([, get]) => get(x))]);
+    download(`fonlar-${location.pathname.split("/").pop()}-${VIEWS[view].name.toLocaleLowerCase("tr")}-${today()}.csv`, toCsv(headers, data));
+  };
   const addRule = () => {
     if (!draft.a) return;
     const r: AssetRule = { a: draft.a, op: draft.op, min: draft.op === "has" ? Math.max(0, Number(draft.min) || 0) : 0 };
@@ -227,9 +239,12 @@ function FundTableView({ data }: { data: string }) {
         </p>
       </details>
 
-      <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
-        <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
+          <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
+        </Tabs>
+        <Button size="sm" variant="outline" className="ml-auto" onClick={exportCsv} disabled={!rows.length} title="Filtrelenmiş tüm satırlar, açık görünümün sütunlarıyla">CSV indir ({rows.length})</Button>
+      </div>
 
       {view === "nakit" && byCat.length > 0 && (
         <div className="flex flex-wrap gap-2 text-xs">

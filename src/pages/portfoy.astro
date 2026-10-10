@@ -3,6 +3,7 @@ import Base from "../layouts/Base.astro";
 import CompareChart from "../components/CompareChart";
 import Matrix from "../components/Matrix.astro";
 import PortfolioForm from "../components/PortfolioForm";
+import CsvButton from "../components/CsvButton";
 import { getBench, getFunds } from "../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../lib/analytics";
 import { corr, dailyReturns, overlap } from "../lib/stats";
@@ -72,7 +73,12 @@ const initial = entered.map((e) => ({ code: e.code, mode: e.mode, value: String(
       </div>
 
       <section class="mb-8">
-        <h2 class="mb-3 font-semibold">Fonlar</h2>
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <h2 class="font-semibold">Fonlar</h2>
+          <CsvButton client:only="react" filename={`portfoy-${new Date().toISOString().slice(0, 10)}.csv`}
+            headers={["Kod", "Fon", "Adet", "Fiyat", "Tutar (₺)", "Pay %"]}
+            rows={funds.map((f) => [f.code, f.name, units.get(f.code)!, price.get(f.code)!, amounts.get(f.code)!, w(f.code) * 100])} />
+        </div>
         <div class="overflow-x-auto rounded-lg border">
           <table class="w-full text-sm tabular-nums">
             <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Adet</th><th class="p-2">Fiyat</th><th class="p-2">Tutar</th><th class="p-2">Pay</th></tr></thead>
