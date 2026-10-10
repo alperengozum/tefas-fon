@@ -50,3 +50,5 @@ CREATE TABLE IF NOT EXISTS stopaj_rule (
   "from" date PRIMARY KEY, a double precision NOT NULL, b double precision NOT NULL, serbest_hy double precision NOT NULL DEFAULT 0,
   source text NOT NULL, added timestamptz NOT NULL DEFAULT now()
 );
+-- son 1 yılın en büyük düşüşü (%, ≤ 0): zirveden dibe; volatiliteyle aynı geçişte hesaplanır
+ALTER TABLE fund_vol ADD COLUMN IF NOT EXISTS mdd double precision;

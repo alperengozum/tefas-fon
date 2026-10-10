@@ -20,6 +20,7 @@ const RISK: Col = { key: "risk", head: "Risk", fmt: (v) => v ?? "–" };
 const VIEWS: Record<string, { name: string; cols: Col[] }> = {
   getiri: { name: "Getiri", cols: [R("d1", "1G"), R("w1", "1H"), R("m1", "1A"), R("m3", "3A"), R("m6", "6A"), R("ytd", "YBB"), R("y1", "1Y"), R("y2", "2Y"), R("y3", "3Y"), R("y5", "5Y"), RISK] },
   buyukluk: { name: "Büyüklük", cols: [{ key: "size", head: "Büyüklük", fmt: tl }, { key: "investors", head: "Yatırımcı", fmt: (v) => v?.toLocaleString("tr-TR") ?? "–" }, { key: "price", head: "Fiyat", fmt: price }, RISK] },
+  risk: { name: "Risk", cols: [RISK, { key: "vol", head: "Volatilite 1Y", fmt: (v) => (v == null ? "–" : `${v.toFixed(2)}%`) }, R("mdd", "Maks. düşüş 1Y"), R("y1", "Getiri 1Y")] },
   nakit: { name: "Nakit Giriş-Çıkışı", cols: [F("flow_w1", "1 Hafta"), F("flow_m1", "1 Ay"), F("flow_m3", "3 Ay"), { key: "size", head: "Büyüklük", fmt: tl }] },
 };
 const MAX_COMPARE = 10;
@@ -222,7 +223,7 @@ function FundTableView({ data }: { data: string }) {
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Aktif: fonun TEFAS'ta son 7 gün içinde veri yayımlaması ve KAP'ta tasfiye duyurusu olmaması; pasif fonlarda (tasfiye/birleşme) getiri ve nakit akışı gösterilmez. Yönetim ücreti, stopaj ve TEFAS işlem açık/kapalı bilgisi TEFAS API'sinde yok.
+          Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Maks. düşüş: son 1 yılda zirveden dibe en büyük kayıp. Aktif: fonun TEFAS'ta son 7 gün içinde veri yayımlaması ve KAP'ta tasfiye duyurusu olmaması; pasif fonlarda (tasfiye/birleşme) getiri ve nakit akışı gösterilmez. Yönetim ücreti, stopaj ve TEFAS işlem açık/kapalı bilgisi TEFAS API'sinde yok.
         </p>
       </details>
 

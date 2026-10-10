@@ -3,9 +3,9 @@ import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import PinButton from "../../components/PinButton";
-import { getBench, getFund, getFunds, getHoldings, getNews, overlapping, peers } from "../../lib/db";
+import { getBench, getFund, getFunds, getHoldings, getNews, listFunds, overlapping, peers, riskFree } from "../../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
-import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
+import { annualVol, beta, calendar, corr, dailyReturns, drawdown, rank, ratios, rolling } from "../../lib/stats";
 import { label, pct, price, tl, tone, trDate } from "../../lib/format";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
@@ -18,6 +18,18 @@ const since = new Date(new Date(last.date).getTime() - 365 * 864e5).toISOString(
 const fr = dailyReturns(f.history, since), br = bench.BIST100 ? dailyReturns(bench.BIST100, since) : null;
 const [b100, c100] = br ? [beta(fr, br), corr(fr, br)] : [null, null];
 const roll = rolling(f.history, 91);
+// Risk: son 1 yıl en büyük düşüş, Sharpe/Sortino (risksiz = PPF medyanı), kategori (aynı tür, aktif) içi sıra, takvim getirileri
+const [rf, { funds: listed }] = await Promise.all([riskFree(), listFunds(f.kind)]);
+const dd = drawdown(f.history, since);
+const rr = rf == null ? null : ratios(fr, rf);
+const vol1 = annualVol(fr);
+const me = listed.find((x) => x.code === f.code);
+const cat = me?.active ? listed.filter((x) => x.active && x.type === me.type) : [];
+const ranks = me ? ([["1A", "m1"], ["3A", "m3"], ["1Y", "y1"], ["3Y", "y3"], ["Maks. düşüş 1Y", "mdd"]] as const)
+  .map(([k, key]) => [k, rank(me[key], cat.map((x) => x[key]))] as const).filter(([, r]) => r) : [];
+const cal = calendar(f.history);
+const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+const p1 = (v: number | null) => (v == null ? "–" : `${v > 0 ? "+" : ""}${v.toFixed(1)}`);
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o && last.price ? (last.shares - o.shares) * last.price : null; };
 const [rivals, { holdings, report, published, note, seen }, overl, news] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6), getNews(f.code)]);
@@ -88,6 +100,52 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
           <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class={`font-medium tabular-nums ${tone(n as number)}`}>{v}</div></div>
         ))}
         <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Kazandıran pencere</div><div class="font-medium tabular-nums">{roll.pos.toFixed(0)}%</div></div>
+      </div>
+    </section>
+  )}
+
+  {(dd || rr?.sharpe != null) && (
+    <section class="mb-8" data-section="risk">
+      <h2 class="mb-3 font-semibold">Risk ve getiri kalitesi <span class="text-xs font-normal text-muted-foreground">son 1 yıl, günlük fiyatlar</span></h2>
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {dd && (
+          <div class="rounded-lg border p-3">
+            <div class="text-xs text-muted-foreground">Maks. düşüş</div>
+            <div class={`font-medium tabular-nums ${tone(dd.max)}`}>{pct(dd.max)}</div>
+            {dd.max < 0 && <div class="mt-1 text-xs text-muted-foreground">{trDate(dd.peak)} → {trDate(dd.trough)} · {dd.recovered ? `${dd.recovery} günde toparlandı` : "henüz toparlanmadı"}</div>}
+          </div>
+        )}
+        <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Volatilite (yıllık)</div><div class="font-medium tabular-nums">{vol1 == null ? "–" : `${vol1.toFixed(2)}%`}</div></div>
+        <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Sharpe</div><div class={`font-medium tabular-nums ${tone(rr?.sharpe)}`}>{rr?.sharpe?.toFixed(2) ?? "–"}</div></div>
+        <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Sortino</div><div class={`font-medium tabular-nums ${tone(rr?.sortino)}`}>{rr?.sortino?.toFixed(2) ?? "–"}</div></div>
+      </div>
+      {rf != null && <p class="mt-2 text-xs text-muted-foreground">Sharpe/Sortino: risksiz getiriyi (TL para piyasası fonlarının 1Y medyanı, {pct(rf * 100)}) aşan getirinin oynaklığa oranı. 1'in üstü iyi kabul edilir; Sortino yalnız aşağı yönlü oynaklığı sayar.</p>}
+    </section>
+  )}
+
+  {ranks.length > 0 && me && (
+    <section class="mb-8" data-section="rank">
+      <h2 class="mb-3 font-semibold">Kategorisinde sırası <span class="text-xs font-normal text-muted-foreground">{me.type} · aktif {cat.length} fon arasında (1 = en iyi)</span></h2>
+      <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {ranks.map(([k, r]) => (
+          <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class="font-medium tabular-nums">{r!.rank} / {r!.n}</div><div class="text-xs text-muted-foreground">ilk %{r!.top}</div></div>
+        ))}
+      </div>
+    </section>
+  )}
+
+  {cal.length > 0 && (
+    <section class="mb-8" data-section="calendar">
+      <h2 class="mb-3 font-semibold">Takvim getirileri <span class="text-xs font-normal text-muted-foreground">aylık ve yıllık, % · içinde bulunulan dönem son fiyata kadar</span></h2>
+      <div class="overflow-x-auto rounded-lg border">
+        <table class="w-full text-xs tabular-nums">
+          <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Yıl</th>{MONTHS.map((m) => <th class="p-2">{m}</th>)}<th class="p-2">Yıl</th></tr></thead>
+          <tbody>
+            {cal.map((r) => (
+              <tr class="border-t"><td class="p-2 text-left font-medium">{r.year}</td>{r.months.map((v) => <td class={`p-2 text-right ${tone(v)}`}>{p1(v)}</td>)}<td class={`p-2 text-right font-medium ${tone(r.total)}`}>{p1(r.total)}</td></tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   )}

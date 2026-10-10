@@ -237,6 +237,32 @@ test("fon detay: endekslere karşı tablo ve grafik", async ({ page }) => {
   for (const t of ["BIST 100", "USD/TRY", "Gram altın"]) await expect(page.getByRole("cell", { name: t })).toBeVisible();
 });
 
+test("fon detay: risk kartları, kategori sırası ve takvim getirileri", async ({ page }) => {
+  await page.goto("/fon/AAA");
+  const risk = page.locator('[data-section="risk"]');
+  await expect(risk.getByRole("heading", { name: /Risk ve getiri kalitesi/ })).toBeVisible();
+  for (const t of ["Maks. düşüş", "Volatilite (yıllık)", "Sharpe", "Sortino"]) {
+    const card = risk.locator("div.rounded-lg", { has: page.getByText(t, { exact: true }) });
+    await expect(card.locator("div.font-medium")).toHaveText(/^[+-]?\d+[.,]\d+%?$/); // sayı, "–" değil
+  }
+  await expect(risk.getByText(/toparlan/)).toBeVisible();
+  const rank = page.locator('[data-section="rank"]');
+  await expect(rank).toContainText("Para Piyasası");
+  await expect(rank.getByText(/^[12] \/ 2$/).first()).toBeVisible(); // seed: 2 aktif PPF
+  const cal = page.locator('[data-section="calendar"] table');
+  for (const m of ["Oca", "Ara", "Yıl"]) await expect(cal.locator("thead")).toContainText(m);
+  await expect(cal.locator("tbody tr").first().locator("td").first()).toHaveText(String(new Date().getFullYear()));
+});
+
+test("liste: Risk sekmesi volatilite ve maks. düşüş sütunları", async ({ page }) => {
+  await ready(page);
+  await page.getByRole("tab", { name: "Risk" }).click();
+  for (const t of ["Volatilite 1Y", "Maks. düşüş 1Y"]) await expect(page.locator("thead")).toContainText(t);
+  const head = page.locator("thead th", { hasText: "Maks. düşüş 1Y" });
+  const idx = await head.evaluate((th) => [...th.parentElement!.children].indexOf(th));
+  await expect(rows(page).first().locator("td").nth(idx)).toHaveText(/^-\d+\.\d{2}%$/); // ingest vol: seed sinüslü, düşüş var
+});
+
 test("hisse sayfası: hisseyi tutan fonlar; bilinmeyen hisse 404", async ({ page, request }) => {
   const codes = await holders(request);
   test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");
