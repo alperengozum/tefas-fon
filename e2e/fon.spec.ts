@@ -87,16 +87,41 @@ test("hızlı filtre butonu aç/kapa", async ({ page }) => {
 test("risk aralığı: min 2 > maks 1 boş liste verir", async ({ page }) => {
   await ready(page);
   await page.getByText("Tüm Filtreler").click();
-  const pick = async (idx: number, value: string) => { // 0: baskın varlık, 1: risk min, 2: risk maks
+  const pick = async (idx: number, value: string) => { // 0: risk min, 1: risk maks
     const trigger = page.locator("details [data-slot=select-trigger]").nth(idx);
     await trigger.click();
     await page.getByRole("option", { name: value, exact: true }).click();
     await expect(trigger).toContainText(value);
     await expect(page.getByRole("option")).toHaveCount(0); // açılır liste tamamen kapanmadan sonrakine geçme
   };
-  await pick(1, "2");
-  await pick(2, "1");
+  await pick(0, "2");
+  await pick(1, "1");
   await expect(rows(page)).toHaveCount(0);
+});
+
+test("varlık içeriği: içersin ≥ % sütun ekler, içermesin daraltır, çip ile kaldırılır", async ({ page }) => {
+  await ready(page);
+  const all = await total(page);
+  await page.getByText("Tüm Filtreler").click();
+  const rule = async (name: string, op: "İçersin" | "İçermesin", min?: string) => {
+    await page.locator("details [data-slot=select-trigger]", { hasText: "Varlık seçin…" }).click();
+    await page.getByRole("option", { name, exact: true }).click();
+    await page.getByRole("button", { name: op, exact: true }).click();
+    if (min) await page.getByPlaceholder("en az %").fill(min);
+    await page.getByRole("button", { name: "Kural ekle" }).click();
+  };
+  await rule("Hisse Senedi", "İçersin", "50");
+  await expect(page.locator("thead")).toContainText("Hisse Senedi %");
+  await expect.poll(() => total(page)).toBeLessThan(all);
+  const col = await page.locator("thead th").allInnerTexts().then((h) => h.findIndex((t) => t.startsWith("Hisse Senedi %")));
+  for (const v of await rows(page).locator(`td:nth-child(${col + 1})`).allInnerTexts()) expect(parseFloat(v)).toBeGreaterThanOrEqual(50);
+  await expect(page.locator("summary")).toContainText("1");
+  await page.getByRole("button", { name: /Hisse Senedi ≥ %50 kuralını kaldır/ }).click();
+  await expect(page.locator("thead")).not.toContainText("Hisse Senedi %");
+  await expect.poll(() => total(page)).toBe(all);
+  await rule("Hisse Senedi", "İçermesin");
+  await expect(page.getByText("Hisse Senedi içermesin")).toBeVisible();
+  await expect.poll(() => total(page)).toBeLessThan(all);
 });
 
 test("fon türü seçici listeyi daraltır", async ({ page }) => {
