@@ -42,6 +42,11 @@ ALTER TABLE kap_notif ADD COLUMN IF NOT EXISTS url text;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc jsonb;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc_date date;
 -- stopaj bekçisi (scripts/stopaj-watch.mjs): taranan Resmi Gazete günleri ve bulunan GVK geçici 67 (fon stopajı) kararları;
--- issue_url: bilinmeyen karar için açılan GitHub issue (boşsa henüz bildirilmedi)
+-- status: bekliyor (kaynaklarda henüz yeni dönem yok) / uygulandi / etkisiz (30 gün içinde kaynaklarda değişiklik çıkmadı)
 CREATE TABLE IF NOT EXISTS rg_scanned (day date PRIMARY KEY);
-CREATE TABLE IF NOT EXISTS stopaj_karar (karar text PRIMARY KEY, day date NOT NULL, title text NOT NULL, url text, issue_url text);
+CREATE TABLE IF NOT EXISTS stopaj_karar (karar text PRIMARY KEY, day date NOT NULL, title text NOT NULL, url text, status text NOT NULL DEFAULT 'bekliyor');
+-- kaynaklardan (scripts/stopaj-sources.mjs) otomatik eklenen stopaj dönemleri; src/lib/stopaj-rules.mjs tablosuyla birleştirilir
+CREATE TABLE IF NOT EXISTS stopaj_rule (
+  "from" date PRIMARY KEY, a double precision NOT NULL, b double precision NOT NULL, serbest_hy double precision NOT NULL DEFAULT 0,
+  source text NOT NULL, added timestamptz NOT NULL DEFAULT now()
+);

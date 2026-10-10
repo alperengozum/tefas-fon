@@ -1,5 +1,8 @@
 import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
+import { mergeRules, STOPAJ_RULES } from "./stopaj-rules.mjs";
+
+type StopajRule = (typeof STOPAJ_RULES)[number];
 
 // Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
@@ -213,6 +216,15 @@ export const tickerFunds = cached(async (ticker: string): Promise<{ code: string
    WHERE h.ticker = $1 ORDER BY amount DESC NULLS LAST`,
   [ticker],
 )).rows, (t) => t);
+
+// Stopaj kuralları: koddaki tablo + kaynaklardan otomatik eklenen dönemler (stopaj_rule). Tablo yoksa (eski şema) koddaki tablo.
+export const getStopajRules = cached(async (): Promise<{ rules: StopajRule[]; auto: { from: string; source: string }[] }> => {
+  const { rows } = await pool.query(`SELECT "from"::text, a, b, serbest_hy, source FROM stopaj_rule ORDER BY "from"`).catch(() => ({ rows: [] as any[] }));
+  return {
+    rules: mergeRules(STOPAJ_RULES, rows.map((r) => ({ from: r.from, a: r.a, b: r.b, serbestHisseYogun: r.serbest_hy }))),
+    auto: rows.map((r) => ({ from: r.from, source: r.source })),
+  };
+}, () => "s");
 
 // Fonlarda geçen tüm hisse kodları (arama kutusunda öneri için)
 export const allTickers = cached(async (): Promise<string[]> =>

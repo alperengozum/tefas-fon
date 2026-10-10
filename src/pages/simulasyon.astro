@@ -1,7 +1,7 @@
 ---
 import Base from "../layouts/Base.astro";
 import FundPicker from "../components/FundCombobox";
-import { getBench, getFunds, type Detail } from "../lib/db";
+import { getBench, getFunds, getStopajRules, type Detail } from "../lib/db";
 import { BENCH } from "../lib/analytics";
 import { simulate, type Sim } from "../lib/stats";
 import { afterTax, stopajRate } from "../lib/portfolio";
@@ -19,13 +19,15 @@ const end = isDate(q.get("end")) ?? today;
 // Sonuç yalnız fon seçilip Hesapla'ya basılınca (adreste codes varken) hesaplanır ve gösterilir
 const calc = codes.length > 0;
 const [{ funds }, bench] = calc ? await Promise.all([getFunds(codes), getBench()]) : [{ funds: [] }, {} as Awaited<ReturnType<typeof getBench>>];
+const { rules, auto } = calc ? await getStopajRules() : { rules: undefined, auto: [] };
+const lastAuto = auto.at(-1);
 // Stopaj sonrası net (yalnız fonlar): SIP'te her alım kendi elde tutma süresiyle; tek seferlik başlangıç gününden
 const net = (f: Detail, sim: Sim | null) => {
   if (!sim) return null;
   const tf = { kind: f.kind, name: f.name, stockFocus: classify(f.name, f.kind).stockFocus, stock: f.alloc.hs ?? 0 };
   const units = sim.lots.reduce((s, l) => s + l.units, 0);
-  const sip = afterTax(tf, sim.lots, sim.value / units, sim.last);
-  const rate = stopajRate(tf, sim.start, sim.last);
+  const sip = afterTax(tf, sim.lots, sim.value / units, sim.last, rules);
+  const rate = stopajRate(tf, sim.start, sim.last, rules);
   return { sip: (sip.net / sim.invested - 1) * 100, lump: sim.lump - Math.max(0, sim.lump) * (rate ?? 0), rate };
 };
 const rows = [
@@ -76,6 +78,6 @@ const missing = codes.filter((c) => !funds.some((f) => f.code === c));
     </table>
   </div>
   <p class="mt-3 text-xs text-muted-foreground">Her ay başlangıç günü aynı gün (yoksa sonraki işlem günü) alım yapılır; bitiş fiyatıyla değerlenir. Fon geçmişi ingest edilen kadardır (yaklaşık son 13 ay, günde bir uzar); daha eski başlangıçlarda "veri yok" çıkabilir. Yıllık oran 90 günden kısa sürede gösterilmez. Endeksler: BIST 100 (puan), USD/TRY, gram altın (Yahoo Finance).</p>
-  <p class="mt-1 text-xs text-muted-foreground" data-testid="stopaj-not">Stopaj (gerçek kişi): her alım kendi alış tarihindeki oranla. 9 Temmuz 2025 sonrası alımlarda genel %17,5; öncesinde fon grubuna göre %0–15 (ör. para piyasası/borçlanma 23.12.2020–30.04.2024 arası %0). TEFAS'taki hisse senedi yoğun fonlar %0 (serbest olanlarda 27 Mart 2026 sonrası alımlar %17,5); portföyünün ≥ %51'i BIST hissesi olan fon 1 yıldan, GYF/GSYF 2 yıldan uzun tutulunca %0; BES'te fon stopajı yok. Yalnız kazançlı alımlar vergilenir; vergi tavsiyesi değildir.</p>
+  <p class="mt-1 text-xs text-muted-foreground" data-testid="stopaj-not">Stopaj (gerçek kişi): her alım kendi alış tarihindeki oranla. 9 Temmuz 2025 sonrası alımlarda genel %17,5; öncesinde fon grubuna göre %0–15 (ör. para piyasası/borçlanma 23.12.2020–30.04.2024 arası %0). TEFAS'taki hisse senedi yoğun fonlar %0 (serbest olanlarda 27 Mart 2026 sonrası alımlar %17,5); portföyünün ≥ %51'i BIST hissesi olan fon 1 yıldan, GYF/GSYF 2 yıldan uzun tutulunca %0; BES'te fon stopajı yok. Yalnız kazançlı alımlar vergilenir; vergi tavsiyesi değildir. Oranlar Resmi Gazete takibi ve portföy şirketi/banka stopaj tablolarıyla otomatik güncellenir{lastAuto && <span data-testid="stopaj-oto"> (son güncelleme: {lastAuto.from.split("-").reverse().join(".")} ve sonrası alımlar, kaynak {lastAuto.source})</span>}.</p>
   </>}
 </Base>

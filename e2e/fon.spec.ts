@@ -289,14 +289,16 @@ test("portföy: seçicilerle tutar ve adet gir, birleşik analiz, tarayıcıda h
   await expect(page.getByTestId("portfoy-satir")).toHaveCount(2);
 });
 
-test("simülasyon: stopaj sonrası net sütunları (fon %17,5 / hisse yoğun yok, endekste boş)", async ({ page }) => {
+test("simülasyon: stopaj sonrası net sütunları, DB'deki otomatik stopaj dönemi uygulanır, endekste boş", async ({ page }) => {
   await page.goto("/simulasyon?codes=AAA&monthly=1000");
   const fund = page.locator("tbody tr").first();
   await expect(fund).toContainText("AAA");
   const lump = await fund.locator("td").nth(7).innerText(), netLump = await fund.locator('[data-col="net-lump"]').innerText();
   const n = (s) => Number(s.replace("%", "").replace("+", ""));
-  expect(n(netLump)).toBeCloseTo(n(lump) * 0.825, 1); // PPF: %17,5 stopaj, kazançlı
-  await expect(fund.locator('[data-col="net-lump"]')).toHaveAttribute("title", "stopaj %17.5");
+  // seed: stopaj_rule'da 400 gün önceden itibaren %10 (otomatik kaynak dönemi) -> 1 yıl önceki tek seferlik alım %10, koddaki %17,5 değil
+  expect(n(netLump)).toBeCloseTo(n(lump) * 0.9, 1);
+  await expect(fund.locator('[data-col="net-lump"]')).toHaveAttribute("title", "stopaj %10.0");
+  await expect(page.getByTestId("stopaj-oto")).toContainText("Test Kaynağı");
   await expect(fund.locator('[data-col="net-sip"]')).toHaveText(/^[+-]\d+\.\d{2}%$/);
   await expect(page.locator("tbody tr", { hasText: "BIST 100" }).locator('[data-col="net-sip"]')).toHaveText("–");
   await expect(page.getByTestId("stopaj-not")).toContainText("%17,5");

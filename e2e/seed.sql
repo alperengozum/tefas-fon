@@ -24,3 +24,6 @@ INSERT INTO holdings_meta (code, disclosure_index, report, published) VALUES
 -- benchmark serileri (BIST100, USD, ALTIN), 401 gün
 INSERT INTO bench SELECT s, current_date - d, base * (1 + 0.001 * (400 - d) + 0.01 * sin(d))
 FROM (VALUES ('BIST100', 10000.0), ('USD', 30.0), ('ALTIN', 3000.0)) v(s, base), generate_series(0, 400) d;
+
+-- otomatik stopaj dönemi (scripts/stopaj-watch.mjs kaynaklardan yazar): 400 gün önceden itibaren %10; simülasyon bunu kullanmalı
+INSERT INTO stopaj_rule ("from", a, b, serbest_hy, source) VALUES (current_date - 400, 0.10, 0.10, 0.175, 'Test Kaynağı');

@@ -96,11 +96,14 @@ npm run dev          # http://localhost:4321
 
 ### Stopaj oranları değişince
 
-Simülasyondaki stopaj sonrası net getiri `src/lib/stopaj-rules.mjs` tablosundan hesaplanır: alış tarihine göre dönemler, fon grubu başına oran. Oranlar Cumhurbaşkanı Kararı ile Resmi Gazete'de değişir; makinece okunur bir kaynağı yok.
+Simülasyondaki stopaj sonrası net getiri, alış tarihine göre dönemler ve fon grubu başına oranlardan hesaplanır: taban tablo `src/lib/stopaj-rules.mjs`, üstüne kaynaklardan otomatik eklenen dönemler (`stopaj_rule`). Oranlar Cumhurbaşkanı Kararı ile Resmi Gazete'de değişir; kararlar görüntü PDF olduğundan oranlar onları metin olarak yeniden yayımlayan kurumlardan okunur. Anahtar/token gerekmez.
 
-- **Bekçi** (`scripts/stopaj-watch.mjs`, günlük döngüde otomatik): Resmi Gazete fihristini tarar, GVK geçici 67 kararlarını `stopaj_karar` tablosuna yazar. Tabloda ya da `REVIEWED` listesinde olmayan bir karar görürse `GITHUB_TOKEN` (fine-grained, bu repo için **Issues: write**) ile GitHub issue açar; token yoksa loga `UYARI` yazar. Oranı kendisi değiştirmez.
-- **Issue gelince:** karar metnini okuyun. Gerçek kişilerin fon payı oranını değiştiriyorsa `STOPAJ_RULES`'a yürürlük tarihli bir satır ekleyin ve `test/portfolio.test.mjs`'e o dönem için test yazın. Değiştirmiyorsa (DİBS, kurumlar vb.) nedeniyle `REVIEWED`'a ekleyin.
-- Ortam: `GITHUB_TOKEN`, `GITHUB_REPO` (varsayılan `alperengozum/tefas-fon`). İlk çalıştırma geriye 30 gün tarar (`node scripts/stopaj-watch.mjs 200` ile daha fazla).
+- **Bekçi** (`scripts/stopaj-watch.mjs`, günlük döngüde otomatik):
+  1. Resmi Gazete fihristini tarar, GVK geçici 67 kararlarını `stopaj_karar`'a yazar (bilinmeyen karar: `bekliyor`).
+  2. Kaynakları okur (`scripts/stopaj-sources.mjs`, öncelik sırasıyla): **Ziraat Portföy** stopaj tablosu (ana sayfadaki PDF), **Garanti BBVA** ve **Yapı Kredi** stopaj duyuruları. Bir kaynak, tablodaki tüm geçmiş dönemlerle tutarlıysa güvenilir sayılır ve yalnız son bilinen dönemden **sonraki** yeni dönemleri önerebilir. Güvenilir ilk kaynağın yeni dönemi `stopaj_rule`'a yazılır; güvenilir iki kaynak yeni dönemde ayrışırsa hiçbir şey yazılmaz. Okunamayan/çelişen kaynak atlanır, bayat kaynak zararsızdır.
+  3. Bekleyen karar, yeni dönem uygulanınca `uygulandi`; 30 gün içinde kaynaklarda değişiklik çıkmazsa `etkisiz` (ör. yalnız kurumları ilgilendiren karar) olur.
+- Kayıtlar `stopaj:` önekiyle loglanır (`UYGULANDI: ...`, `... tablo ile çelişiyor`, `... okunamadı`). Kaynak sayfası adres/düzen değiştirirse o kaynak "okunamadı" der, diğerleri işe yarar; düzeltme `stopaj-sources.mjs`'teki ayrıştırıcıdadır.
+- Elle müdahale gerekirse `STOPAJ_RULES`'a satır eklenebilir; etkisiz olduğu bilinen kararlar `REVIEWED`'a. İlk çalıştırma Resmi Gazete'de geriye 30 gün tarar (`node scripts/stopaj-watch.mjs 200` ile daha fazla).
 
 ## Sayfalar ve URL'ler
 

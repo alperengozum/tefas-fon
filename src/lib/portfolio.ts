@@ -1,5 +1,7 @@
 // Portföy ve vergi hesapları (saf, DB/Astro bağımsız): stopaj, stopaj sonrası net getiri, yeniden dengeleme, portföy riski.
-import { ruleAt } from "./stopaj-rules.mjs";
+import { ruleAt, STOPAJ_RULES } from "./stopaj-rules.mjs";
+
+type StopajRule = (typeof STOPAJ_RULES)[number];
 
 const day = (s: string) => Date.parse(s + "T00:00:00Z") / 864e5;
 
@@ -14,9 +16,10 @@ const day = (s: string) => Date.parse(s + "T00:00:00Z") / 864e5;
 export type TaxFund = { kind: string; name: string; stockFocus: boolean; stock: number };
 const up = (s: string) => s.toLocaleUpperCase("tr").replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G").replace(/Ö/g, "O").replace(/Ü/g, "U").replace(/Ç/g, "C");
 const GROUP_A = /DEGISKEN|KARMA|EUROBOND|DIS BORCLANMA|YABANCI|SERBEST|DOVIZ/;
-export function stopajRate(f: TaxFund, buy: string, sell: string): number | null {
+// rules: koddaki tablo + otomatik eklenenler (db.getStopajRules); verilmezse koddaki tablo
+export function stopajRate(f: TaxFund, buy: string, sell: string, rules: StopajRule[] = STOPAJ_RULES): number | null {
   if (f.kind === "EMK") return null;
-  const r = ruleAt(buy), held = day(sell) - day(buy), name = up(f.name);
+  const r = ruleAt(buy, rules), held = day(sell) - day(buy), name = up(f.name);
   if (f.stockFocus) return /SERBEST/.test(name) ? (r.serbestHisseYogun ?? 0) : 0;
   if (f.stock >= 51 && held > 365) return 0;
   if (f.kind === "GYF" || f.kind === "GSYF") return held > 730 ? 0 : r.b;
@@ -26,12 +29,12 @@ export function stopajRate(f: TaxFund, buy: string, sell: string): number | null
 export type Lot = { date: string; units: number; cost: number };
 
 // Lot bazında stopaj: her alımın kazancı (zararlı lot vergilenmez) kendi elde tutma süresinin oranıyla. BES: vergi 0.
-export function afterTax(f: TaxFund, lots: Lot[], price: number, sell: string): { gross: number; tax: number; net: number } {
+export function afterTax(f: TaxFund, lots: Lot[], price: number, sell: string, rules: StopajRule[] = STOPAJ_RULES): { gross: number; tax: number; net: number } {
   let gross = 0, tax = 0;
   for (const l of lots) {
     const v = l.units * price, gain = v - l.cost;
     gross += v;
-    if (gain > 0) tax += gain * (stopajRate(f, l.date, sell) ?? 0);
+    if (gain > 0) tax += gain * (stopajRate(f, l.date, sell, rules) ?? 0);
   }
   return { gross, tax, net: gross - tax };
 }
