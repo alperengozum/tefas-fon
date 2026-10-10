@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
-import { decodeFunds } from "../lib/compact";
+import { decodeList } from "../lib/compact";
+import { inBase, PERIOD_DAYS } from "../lib/analytics";
 import { fold } from "../lib/classify";
 import { type AssetRule, assetName, assetOptions, matches, ruleText, share } from "../lib/assets";
 import { pct, price, tl, tone } from "../lib/format";
@@ -63,7 +64,14 @@ export default function FundTable({ src }: { src: string }) {
 }
 
 function FundTableView({ data }: { data: string }) {
-  const funds = useMemo(() => decodeFunds(data), [data]);
+  const list = useMemo(() => decodeList(data), [data]);
+  // TL / USD: USD seçiliyken getiri alanları USD/TRY'nin aynı vadeli getirisine göre çevrilir (sıralama ve filtre de çevrilmiş değerle)
+  const [ccy, setCcy] = useState<"TL" | "USD">("TL");
+  const funds = useMemo(() => {
+    const usd = list.usd;
+    if (ccy === "TL" || !usd) return list.funds;
+    return list.funds.map((x) => ({ ...x, ...Object.fromEntries(PERIOD_DAYS.map(([k]) => [k, inBase(x[k as keyof Fund] as number | null, usd[k])])) }));
+  }, [list, ccy]);
   const { pins, toggle } = usePins();
   const [view, setView] = useState("getiri");
   const [f, setF] = useState(EMPTY);
@@ -227,9 +235,19 @@ function FundTableView({ data }: { data: string }) {
         </p>
       </details>
 
-      <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
-        <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
+          <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
+        </Tabs>
+        {list.usd && view !== "buyukluk" && view !== "nakit" && (
+          <div className="flex rounded-md border p-0.5" role="group" aria-label="Getiri para birimi">
+            {(["TL", "USD"] as const).map((c) => (
+              <Button key={c} size="sm" variant={ccy === c ? "default" : "ghost"} aria-pressed={ccy === c} onClick={() => setCcy(c)}>{c === "TL" ? "TL getiri" : "USD bazında"}</Button>
+            ))}
+          </div>
+        )}
+      </div>
+      {ccy === "USD" && view !== "buyukluk" && view !== "nakit" && <p className="text-xs text-muted-foreground" data-testid="usd-not">Getiriler USD bazında: (1 + TL getiri) / (1 + USD/TRY getirisi) − 1. Dolar bazında kazandı mı sorusunun cevabı.</p>}
 
       {view === "nakit" && byCat.length > 0 && (
         <div className="flex flex-wrap gap-2 text-xs">

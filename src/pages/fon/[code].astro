@@ -4,7 +4,7 @@ import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import PinButton from "../../components/PinButton";
 import { getBench, getFund, getFunds, getHoldings, getNews, listFunds, overlapping, peers, riskFree } from "../../lib/db";
-import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
+import { BENCH, forChart, inBase, ret, RETURNS } from "../../lib/analytics";
 import { annualVol, beta, calendar, corr, dailyReturns, drawdown, rank, ratios, rolling } from "../../lib/stats";
 import { label, pct, price, tl, tone, trDate } from "../../lib/format";
 
@@ -88,6 +88,9 @@ const KIND_NAME: Record<string, [string, string]> = { YAT: ["Yatırım Fonları"
             {[[f.code, f.history] as const, ...benches.map(([s, l]) => [l, bench[s]] as const)].map(([l, h], i) => (
               <tr class={`border-t ${i === 0 ? "font-medium" : ""}`}><td class="p-2 text-left">{l}</td>{RETURNS.map(([, d]) => { const r = ret(h, d); return <td class={`p-2 text-right ${tone(r)}`}>{pct(r)}</td>; })}</tr>
             ))}
+            {bench.USD && (
+              <tr class="border-t bg-muted/30 font-medium" data-testid="usd-satir"><td class="p-2 text-left">{f.code} USD bazında</td>{RETURNS.map(([, d]) => { const r = inBase(ret(f.history, d), ret(bench.USD, d)); return <td class={`p-2 text-right ${tone(r)}`}>{pct(r)}</td>; })}</tr>
+            )}
           </tbody>
         </table>
       </div>
