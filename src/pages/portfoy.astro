@@ -110,7 +110,7 @@ const exact = (v: number) => `${Math.round(v).toLocaleString("tr-TR")} ₺`;
 
       {trades.length > 0 && (
         <section class="mb-8" data-section="dengeleme">
-          <h2 class="mb-3 font-semibold">Yeniden dengeleme <span class="text-xs font-normal text-muted-foreground">hedef ağırlıklara göre{cash > 0 && ` · ${tl(cash)} ek nakit`}{noSell && " · satış yapmadan"}</span></h2>
+          <h2 class="mb-3 font-semibold">Yeniden dengeleme <span class="text-xs font-normal text-muted-foreground">hedef ağırlıklara göre{cash > 0 && ` · ${exact(cash)} ek nakit`}{noSell && " · satış yapmadan"}</span></h2>
           {Math.abs(targetSum - 100) >= 0.01 && <p class="mb-2 text-xs text-amber-600">Hedeflerin toplamı %{targetSum.toLocaleString("tr-TR")}; 100'e oranlandı.</p>}
           <div class="overflow-x-auto rounded-lg border">
             <table class="w-full text-sm tabular-nums">
