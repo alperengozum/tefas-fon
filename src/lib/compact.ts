@@ -2,7 +2,7 @@ import type { Fund } from "./db";
 import { fold } from "./classify";
 
 // Liste sayfası 2000+ fonu HTML'e gömüyordu (nesne başına ~1.3KB, Astro her değeri [0,v] ile sarıyor -> 2.6MB).
-// Burada satırlar dizi, tekrar eden metinler (tür/kurucu/kategori) sözlük, bayraklar bit maskesi, sayılar yuvarlanmış: ~%85 küçük.
+// Burada satırlar dizi, tekrar eden metinler (tür/kurucu) sözlük, bayraklar bit maskesi, sayılar yuvarlanmış: ~%85 küçük.
 // Varlık dağılımı satır sonunda düz [anahtar indeksi, %, ...] dizisi (fon başına ~4 kalem); verisi yoksa null.
 const RET = ["d1", "w1", "m1", "m3", "m6", "ytd", "y1", "y2", "y3", "y5"] as const;
 const FLOW = ["flow_w1", "flow_m1", "flow_m3"] as const;
@@ -15,32 +15,32 @@ const memo = new WeakMap<Fund[], string>(); // listFunds önbelleği aynı diziy
 export function encodeFunds(funds: Fund[]): string {
   const hit = memo.get(funds);
   if (hit) return hit;
-  const dict = (k: "type" | "founder" | "main") => [...new Set(funds.map((f) => f[k]).filter((x): x is string => !!x))];
-  const types = dict("type"), founders = dict("founder"), mains = dict("main");
+  const dict = (k: "type" | "founder") => [...new Set(funds.map((f) => f[k]).filter((x): x is string => !!x))];
+  const types = dict("type"), founders = dict("founder");
   const assets = [...new Set(funds.flatMap((f) => Object.keys(f.alloc ?? {})))];
   const idx = (a: string[]) => new Map(a.map((v, i) => [v, i]));
-  const [ti, fi, mi, ai] = [idx(types), idx(founders), idx(mains), idx(assets)];
+  const [ti, fi, ai] = [idx(types), idx(founders), idx(assets)];
   const rows = funds.map((f) => [
-    f.code, f.name, ti.get(f.type), fi.get(f.founder), f.main ? mi.get(f.main) : -1,
+    f.code, f.name, ti.get(f.type), fi.get(f.founder),
     FLAGS.reduce((m, k, i) => m | (f[k] ? 1 << i : 0), 0),
     Math.round(f.price * 1e4) / 1e4, Math.round(f.size), f.investors, r2(f.stock), f.risk,
     ...RET.map((k) => r2(f[k])), ...FLOW.map((k) => (f[k] == null ? null : Math.round(f[k]!))),
     f.alloc ? Object.entries(f.alloc).flatMap(([k, v]) => [ai.get(k), r2(v)]) : null,
   ]);
-  const out = JSON.stringify({ types, founders, mains, assets, rows });
+  const out = JSON.stringify({ types, founders, assets, rows });
   memo.set(funds, out);
   return out;
 }
 
 export function decodeFunds(json: string): FundRow[] {
-  const { types, founders, mains, assets = [], rows } = JSON.parse(json) as { types: string[]; founders: string[]; mains: string[]; assets?: string[]; rows: any[][] };
+  const { types, founders, assets = [], rows } = JSON.parse(json) as { types: string[]; founders: string[]; assets?: string[]; rows: any[][] };
   return rows.map((r) => {
-    const f: any = { code: r[0], kind: "", name: r[1], type: types[r[2]], founder: founders[r[3]], main: r[4] >= 0 ? mains[r[4]] : null,
-      price: r[6], size: r[7], investors: r[8], stock: r[9], risk: r[10], vol: null };
-    FLAGS.forEach((k, i) => (f[k] = !!(r[5] & (1 << i))));
-    RET.forEach((k, i) => (f[k] = r[11 + i]));
-    FLOW.forEach((k, i) => (f[k] = r[11 + RET.length + i]));
-    const a: number[] | null = r[11 + RET.length + FLOW.length] ?? null;
+    const f: any = { code: r[0], kind: "", name: r[1], type: types[r[2]], founder: founders[r[3]],
+      price: r[5], size: r[6], investors: r[7], stock: r[8], risk: r[9], vol: null };
+    FLAGS.forEach((k, i) => (f[k] = !!(r[4] & (1 << i))));
+    RET.forEach((k, i) => (f[k] = r[10 + i]));
+    FLOW.forEach((k, i) => (f[k] = r[10 + RET.length + i]));
+    const a: number[] | null = r[10 + RET.length + FLOW.length] ?? null;
     f.alloc = a && {};
     for (let i = 0; a && i < a.length; i += 2) f.alloc[assets[a[i]]] = a[i + 1];
     f.hay = fold(`${f.code} ${f.name}`);

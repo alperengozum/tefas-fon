@@ -3,7 +3,7 @@ import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
 import { fold } from "../lib/classify";
 import { type AssetRule, assetName, assetOptions, matches, ruleText, share } from "../lib/assets";
-import { label, pct, price, tl, tone } from "../lib/format";
+import { pct, price, tl, tone } from "../lib/format";
 import { usePins } from "../lib/pins";
 import { PinToggle } from "./PinButton";
 import { Input } from "./ui/input";
@@ -30,9 +30,9 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
   { key: "qualified", name: "Nitelikli / Özel" }, { key: "oks", name: "OKS" },
 ];
 
-const EMPTY = { q: "", status: "aktif", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "", assets: [] as AssetRule[] };
+const EMPTY = { q: "", status: "aktif", type: "", founder: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "", assets: [] as AssetRule[] };
 // "Tüm Filtreler" paneli kapalıyken de kaç filtrenin açık olduğu görünsün
-const PANEL = ["cat", "riskMin", "riskMax", "invMin", "invMax", "sizeMin", "sizeMax", "stockMin"] as const;
+const PANEL = ["riskMin", "riskMax", "invMin", "invMax", "sizeMin", "sizeMax", "stockMin"] as const;
 // Sıralama anahtarı: Fund alanı veya "@<varlık>" (varlık kuralı sütunu, ör. "@g:mevduat")
 type SortKey = keyof Fund | `@${string}`;
 const val = (x: Fund, k: SortKey): any => (k.startsWith("@") ? (x.alloc ? share(x.alloc, k.slice(1)) : null) : x[k as keyof Fund]);
@@ -91,7 +91,6 @@ function FundTableView({ data }: { data: string }) {
     const uniq = (k: keyof Fund) => [...new Set(funds.map((x) => x[k] as string).filter(Boolean))].sort((a, b) => a.localeCompare(b, "tr"));
     return {
       types: uniq("type"), founders: uniq("founder"),
-      cats: uniq("main").sort((a, b) => label(a).localeCompare(label(b), "tr")),
       flags: FLAGS.filter((fl) => funds.some((x) => x[fl.key])),
       assets: assetOptions(new Set(funds.flatMap((x) => Object.keys(x.alloc ?? {})))),
     };
@@ -106,7 +105,7 @@ function FundTableView({ data }: { data: string }) {
     return funds
       .filter((x) =>
         (!s || x.hay.includes(s)) &&
-        (!df.status || x.active === (df.status === "aktif")) && (!df.type || x.type === df.type) && (!df.founder || x.founder === df.founder) && (!df.cat || x.main === df.cat) &&
+        (!df.status || x.active === (df.status === "aktif")) && (!df.type || x.type === df.type) && (!df.founder || x.founder === df.founder) &&
         df.flags.every((k) => x[k as keyof Fund]) &&
         (riskMin == null || (x.risk != null && x.risk >= riskMin)) && (riskMax == null || (x.risk != null && x.risk <= riskMax)) &&
         (invMin == null || (x.investors ?? 0) >= invMin) && (invMax == null || (x.investors ?? 0) <= invMax) &&
@@ -187,9 +186,6 @@ function FundTableView({ data }: { data: string }) {
       <details className="rounded-lg border p-3">
         <summary className="cursor-pointer text-sm font-medium">Tüm Filtreler{panelOn > 0 && <Badge className="ml-2">{panelOn}</Badge>}</summary>
         <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1"><div className="text-muted-foreground">Baskın varlık</div>
-            <Pick className="w-full" value={f.cat} onChange={(v) => set({ cat: v })} all="Tümü" items={opts.cats.map((c) => ({ value: c, label: label(c) }))} />
-          </div>
           <div className="space-y-1"><div className="text-muted-foreground">Risk değeri (1–7, tahmini)</div>
             <div className="flex items-center gap-2">{riskSel("riskMin", "Min")}–{riskSel("riskMax", "Maks")}</div></div>
           <div className="space-y-1"><div className="text-muted-foreground">Yatırımcı sayısı</div>

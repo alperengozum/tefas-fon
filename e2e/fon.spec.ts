@@ -87,15 +87,15 @@ test("hızlı filtre butonu aç/kapa", async ({ page }) => {
 test("risk aralığı: min 2 > maks 1 boş liste verir", async ({ page }) => {
   await ready(page);
   await page.getByText("Tüm Filtreler").click();
-  const pick = async (idx: number, value: string) => { // 0: baskın varlık, 1: risk min, 2: risk maks
+  const pick = async (idx: number, value: string) => { // 0: risk min, 1: risk maks
     const trigger = page.locator("details [data-slot=select-trigger]").nth(idx);
     await trigger.click();
     await page.getByRole("option", { name: value, exact: true }).click();
     await expect(trigger).toContainText(value);
     await expect(page.getByRole("option")).toHaveCount(0); // açılır liste tamamen kapanmadan sonrakine geçme
   };
-  await pick(1, "2");
-  await pick(2, "1");
+  await pick(0, "2");
+  await pick(1, "1");
   await expect(rows(page)).toHaveCount(0);
 });
 
