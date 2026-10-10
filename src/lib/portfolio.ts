@@ -1,23 +1,26 @@
 // Portföy ve vergi hesapları (saf, DB/Astro bağımsız): stopaj, stopaj sonrası net getiri, yeniden dengeleme, portföy riski.
+import { ruleAt } from "./stopaj-rules.mjs";
+
 const day = (s: string) => Date.parse(s + "T00:00:00Z") / 864e5;
 
-// GVK geçici 67 stopaj oranı (9 Temmuz 2025 sonrası alımlar, Karar 10041; Karar 11107 ile 27 Mart 2026 değişikliği):
-// - genel %17,5; TEFAS'ta işlem gören hisse senedi yoğun fon %0 (serbest hisse yoğunlarda 27.03.2026 ve sonrası alımlar %17,5)
-// - BYF: portföyün ≥ %51'i BIST hissesiyse 1 yıldan uzun tutulunca %0
-// - GYF/GSYF: 2 yıldan uzun tutulunca %0
+// Stopaj oranı: alış tarihine göre src/lib/stopaj-rules.mjs tablosundan (yeni karar = yeni satır, mantık değişmez).
 // - BES (EMK): fon düzeyinde stopaj yok (emeklilik kesintisi ayrı) -> null
-// ponytail: 23.12.2020 - 08.07.2025 arası alımlar için geçiş oranları farklı; burada güncel oranlar uygulanır (sayfada not var).
-export const STOPAJ = 0.175;
-// kind: TEFAS türü, stockFocus: classify() çıktısı (adında "HİSSE SENEDİ YOĞUN"), stock: hisse oranı %.
-// Serbestlik addan bakılır: classify tür sırasında "Hisse Senedi" önce geldiği için serbest hisse yoğunlar "Hisse Senedi" türünde.
+// - hisse senedi yoğun %0 (TEFAS dışı serbest hisse yoğunlarda kuralın serbestHisseYogun oranı)
+// - portföyün ≥ %51'i BIST hissesi ve 1 yıldan uzun tutulmuş: %0 (ponytail: "sürekli" şartı güncel dağılımla yaklaşıklanır)
+// - GYF/GSYF: 2 yıldan uzun %0, değilse b grubu
+// - değişken/karma/eurobond/dış borçlanma/yabancı/serbest/döviz: a grubu; diğerleri b grubu
+// kind: TEFAS türü, stockFocus: classify() çıktısı (adında "HİSSE SENEDİ YOĞUN"), stock: BIST hisse oranı % (TEFAS hs).
+// Gruplar addan bakılır: classify tür sırasında "Hisse Senedi" önce geldiği için serbest hisse yoğunlar "Hisse Senedi" türünde.
 export type TaxFund = { kind: string; name: string; stockFocus: boolean; stock: number };
+const up = (s: string) => s.toLocaleUpperCase("tr").replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G").replace(/Ö/g, "O").replace(/Ü/g, "U").replace(/Ç/g, "C");
+const GROUP_A = /DEGISKEN|KARMA|EUROBOND|DIS BORCLANMA|YABANCI|SERBEST|DOVIZ/;
 export function stopajRate(f: TaxFund, buy: string, sell: string): number | null {
   if (f.kind === "EMK") return null;
-  const held = day(sell) - day(buy);
-  if (f.kind === "GYF" || f.kind === "GSYF") return held > 730 ? 0 : STOPAJ;
-  if (f.kind === "BYF") return f.stock >= 51 && held > 365 ? 0 : STOPAJ;
-  if (f.stockFocus) return /SERBEST/i.test(f.name) && buy >= "2026-03-27" ? STOPAJ : 0;
-  return STOPAJ;
+  const r = ruleAt(buy), held = day(sell) - day(buy), name = up(f.name);
+  if (f.stockFocus) return /SERBEST/.test(name) ? (r.serbestHisseYogun ?? 0) : 0;
+  if (f.stock >= 51 && held > 365) return 0;
+  if (f.kind === "GYF" || f.kind === "GSYF") return held > 730 ? 0 : r.b;
+  return GROUP_A.test(name) ? r.a : r.b;
 }
 
 export type Lot = { date: string; units: number; cost: number };

@@ -90,8 +90,17 @@ npm run dev          # http://localhost:4321
 | `npm run ingest [gün]` | TEFAS verisini çek |
 | `npm run ingest -- vol` | Volatiliteyi yeniden hesapla |
 | `npm run holdings` | KAP hisse portföylerini çek |
+| `npm run stopaj-watch` | Resmi Gazete'de yeni fon stopajı kararı ara (aşağıya bakın) |
 | `npm test` | Birim testleri (PDF ayrıştırıcı, istatistik) |
 | `npm run test:e2e` | Playwright e2e testleri |
+
+### Stopaj oranları değişince
+
+Simülasyondaki stopaj sonrası net getiri `src/lib/stopaj-rules.mjs` tablosundan hesaplanır: alış tarihine göre dönemler, fon grubu başına oran. Oranlar Cumhurbaşkanı Kararı ile Resmi Gazete'de değişir; makinece okunur bir kaynağı yok.
+
+- **Bekçi** (`scripts/stopaj-watch.mjs`, günlük döngüde otomatik): Resmi Gazete fihristini tarar, GVK geçici 67 kararlarını `stopaj_karar` tablosuna yazar. Tabloda ya da `REVIEWED` listesinde olmayan bir karar görürse `GITHUB_TOKEN` (fine-grained, bu repo için **Issues: write**) ile GitHub issue açar; token yoksa loga `UYARI` yazar. Oranı kendisi değiştirmez.
+- **Issue gelince:** karar metnini okuyun. Gerçek kişilerin fon payı oranını değiştiriyorsa `STOPAJ_RULES`'a yürürlük tarihli bir satır ekleyin ve `test/portfolio.test.mjs`'e o dönem için test yazın. Değiştirmiyorsa (DİBS, kurumlar vb.) nedeniyle `REVIEWED`'a ekleyin.
+- Ortam: `GITHUB_TOKEN`, `GITHUB_REPO` (varsayılan `alperengozum/tefas-fon`). İlk çalıştırma geriye 30 gün tarar (`node scripts/stopaj-watch.mjs 200` ile daha fazla).
 
 ## Sayfalar ve URL'ler
 

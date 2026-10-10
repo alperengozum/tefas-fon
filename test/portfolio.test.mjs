@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { afterTax, portfolioRisk, rebalance, stopajRate } from "../src/lib/portfolio.ts";
 import { simulate } from "../src/lib/stats.ts";
+import { KNOWN_KARARLAR, ruleAt, STOPAJ_RULES } from "../src/lib/stopaj-rules.mjs";
 
 const near = (a, b, e = 1e-9) => assert.ok(Math.abs(a - b) < e, `${a} ≉ ${b}`);
 const fund = (kind, name, stock = 0) => ({ kind, name, stock, stockFocus: /HİSSE SENEDİ YOĞUN/.test(name) });
@@ -23,6 +24,38 @@ test("stopajRate: fon türü ve elde tutma süresine göre", () => {
   assert.equal(stopajRate(fund("GYF", "GAMA GAYRİMENKUL YATIRIM FONU"), "2025-08-01", "2027-08-01"), 0.175);
   assert.equal(stopajRate(fund("GSYF", "X GİRİŞİM SERMAYESİ YATIRIM FONU"), "2025-08-01", "2027-08-02"), 0);
   assert.equal(stopajRate(fund("EMK", "X EMEKLİLİK YATIRIM FONU"), "2025-08-01", "2026-08-01"), null);
+});
+
+test("stopajRate: alış tarihine göre geçiş dönemleri (Ziraat Portföy tablosu, 27.03.2026)", () => {
+  const ppf = fund("YAT", "ALFA PORTFÖY PARA PİYASASI FONU"); // b grubu (diğer)
+  const dgs = fund("YAT", "ALFA PORTFÖY DEĞİŞKEN FON"); // a grubu
+  const cases = [["2019-06-01", 0.10, 0.10], ["2020-12-22", 0.10, 0.10], ["2020-12-23", 0, 0.10], ["2024-04-30", 0, 0.10], ["2024-05-01", 0.075, 0.10],
+    ["2024-11-01", 0.10, 0.10], ["2025-02-01", 0.15, 0.15], ["2025-07-08", 0.15, 0.15], ["2025-07-09", 0.175, 0.175]];
+  for (const [buy, b, a] of cases) {
+    assert.equal(stopajRate(ppf, buy, "2026-10-01"), b, `PPF ${buy}`);
+    assert.equal(stopajRate(dgs, buy, "2026-10-01"), a, `değişken ${buy}`);
+  }
+  // a grubu: ad içeriğine göre (İ/I tutarsızlığı dahil)
+  for (const n of ["X PORTFÖY KARMA FON", "X EUROBOND (USD) BORÇLANMA ARAÇLARI FONU", "X DIŞ BORÇLANMA ARAÇLARI FONU", "X YABANCI TEKNOLOJİ FONU", "X SERBEST FON", "X KISA VADELI DÖVIZ FON"])
+    assert.equal(stopajRate(fund("YAT", n), "2023-01-01", "2026-10-01"), 0.10, n);
+  assert.equal(stopajRate(fund("YAT", "X ALTIN FONU"), "2023-01-01", "2026-10-01"), 0); // kıymetli maden: b grubu
+  assert.equal(stopajRate(fund("GYF", "X GAYRİMENKUL YATIRIM FONU"), "2024-06-01", "2025-06-01"), 0.075); // 2 yıldan kısa GYF: b grubu
+});
+
+test("stopajRate: ≥ %51 BIST hisseli fon 1 yıldan uzun tutulunca her türde %0", () => {
+  const dgs = fund("YAT", "ALFA PORTFÖY DEĞİŞKEN FON", 60);
+  assert.equal(stopajRate(dgs, "2025-08-01", "2026-08-02"), 0);
+  assert.equal(stopajRate(dgs, "2025-08-01", "2026-08-01"), 0.175);
+  assert.equal(stopajRate(fund("YAT", "ALFA PORTFÖY DEĞİŞKEN FON", 50), "2025-08-01", "2027-08-01"), 0.175);
+});
+
+test("STOPAJ_RULES: artan tarih sırası, oranlar 0-1 arası, ruleAt dönem sınırları", () => {
+  for (let i = 1; i < STOPAJ_RULES.length; i++) assert.ok(STOPAJ_RULES[i - 1].from < STOPAJ_RULES[i].from, STOPAJ_RULES[i].from);
+  for (const r of STOPAJ_RULES) for (const v of [r.a, r.b, r.serbestHisseYogun ?? 0]) assert.ok(v >= 0 && v <= 1);
+  assert.equal(ruleAt("2025-07-08").from, "2025-02-01");
+  assert.equal(ruleAt("2025-07-09").karar, "10041");
+  assert.equal(ruleAt("2099-01-01").karar, "11107");
+  assert.deepEqual([...KNOWN_KARARLAR].sort(), ["10041", "11107", "11444", "11734"]); // tablo + etkisiz incelenenler (REVIEWED)
 });
 
 test("afterTax: yalnız kazançlı lot vergilenir; BES vergisiz", () => {
