@@ -2,6 +2,7 @@
 // (taranabilir, paylaşılabilir). Yalnız aktif fonlar, değeri boş olan atılır.
 export type ScanFund = {
   code: string; name: string; kind: string; type: string; active: boolean; fx: boolean; qualified: boolean;
+  islamic: boolean; // katılıma uygun: adında KATILIM veya KİRA SERTİFİKALARI (classify)
   size: number; investors: number; risk: number | null; m1: number | null; m3: number | null; y1: number | null; flow_m1: number | null;
 };
 type Key = "y1" | "m3" | "m1" | "flow_m1" | "size";
@@ -22,6 +23,10 @@ export const SCANS: Scan[] = [
   { slug: "altin-fonlari", title: "Altın ve kıymetli maden fonları", description: "Kıymetli maden fonları, 1 yıllık getiriye göre.", kind: "YAT", filter: (f) => f.type === "Kıymetli Maden" && big(f), sort: "y1", dir: -1, cols: ["y1", "m3", "m1", "size"] },
   { slug: "doviz-fonlari", title: "Döviz cinsi fonlar", description: "Adında döviz geçen fonlar, 1 yıllık getiriye göre.", kind: "YAT", filter: (f) => f.fx && big(f), sort: "y1", dir: -1, cols: ["y1", "m3", "m1", "size"] },
   { slug: "en-cok-kazandiran-bes-fonlari", title: "Son 1 yılda en çok kazandıran BES fonları", description: "Emeklilik (BES) fonları, 1 yıllık getiriye göre.", kind: "EMK", filter: big, sort: "y1", dir: -1, cols: ["y1", "m3", "m1", "size"] },
+  // Katılıma uygun: fon adına göre (KATILIM / KİRA SERTİFİKALARI); danışma kurulu icazeti gibi resmi bilgi TEFAS'ta yok
+  { slug: "katilim-fonlari", title: "Katılıma uygun fonlar", description: "Adında katılım veya kira sertifikası geçen yatırım fonları, 1 yıllık getiriye göre.", kind: "YAT", filter: (f) => f.islamic && big(f), sort: "y1", dir: -1, cols: ["y1", "m3", "m1", "size"] },
+  { slug: "katilim-hisse-fonlari", title: "Katılıma uygun hisse senedi fonları", description: "Katılım hisse senedi fonları, 1 yıllık getiriye göre.", kind: "YAT", filter: (f) => f.islamic && f.type === "Hisse Senedi" && big(f), sort: "y1", dir: -1, cols: ["y1", "m3", "m1", "size"] },
+  { slug: "katilim-bes-fonlari", title: "Katılıma uygun BES fonları", description: "Katılım emeklilik (BES) fonları, 1 yıllık getiriye göre.", kind: "EMK", filter: (f) => f.islamic && big(f), sort: "y1", dir: -1, cols: ["y1", "m3", "m1", "size"] },
 ];
 
 export const COLS: Record<Key, string> = { y1: "1Y getiri", m3: "3A getiri", m1: "1A getiri", flow_m1: "1A net giriş", size: "Büyüklük" };

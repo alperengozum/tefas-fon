@@ -60,7 +60,7 @@ test("fundOgSvg: 1200x630, ad kaçışı ve kısaltma, getiri rengi, çizgi", ()
   assert.ok(!empty.includes("<polyline") && empty.includes("–"));
 });
 
-const f = (code, o = {}) => ({ code, name: code, kind: "YAT", type: "Hisse Senedi", active: true, fx: false, qualified: false, size: 50e6, investors: 100, risk: 5, m1: 1, m3: 2, y1: 10, flow_m1: 0, ...o });
+const f = (code, o = {}) => ({ code, name: code, kind: "YAT", type: "Hisse Senedi", active: true, fx: false, qualified: false, islamic: false, size: 50e6, investors: 100, risk: 5, m1: 1, m3: 2, y1: 10, flow_m1: 0, ...o });
 
 test("runScan: aktif, filtre, boş değer atılır, yöne göre sıralı, limit", () => {
   const s = SCANS.find((x) => x.slug === "en-cok-kazandiran-hisse-fonlari");
@@ -69,6 +69,15 @@ test("runScan: aktif, filtre, boş değer atılır, yöne göre sıralı, limit"
   assert.deepEqual(runScan(s, funds, 1).map((x) => x.code), ["B"]);
   const out = SCANS.find((x) => x.slug === "en-cok-para-cikisi");
   assert.deepEqual(runScan(out, [f("A", { flow_m1: -5 }), f("B", { flow_m1: -50 }), f("C", { flow_m1: 10 })]).map((x) => x.code), ["B", "A"]);
+});
+
+test("katılım taramaları: yalnız katılıma uygun; hisse taraması türe, BES taraması EMK listesine bakar", () => {
+  const scan = (slug) => SCANS.find((x) => x.slug === slug);
+  const funds = [f("K1", { islamic: true, type: "Kıymetli Maden", y1: 40 }), f("K2", { islamic: true, y1: 20 }), f("N1", { y1: 90 }), f("K3", { islamic: true, y1: 99, size: 1e6 })];
+  assert.deepEqual(runScan(scan("katilim-fonlari"), funds).map((x) => x.code), ["K1", "K2"]); // küçük fon (K3) ve katılım olmayan (N1) yok
+  assert.deepEqual(runScan(scan("katilim-hisse-fonlari"), funds).map((x) => x.code), ["K2"]);
+  assert.equal(scan("katilim-bes-fonlari").kind, "EMK");
+  assert.equal(scan("katilim-fonlari").kind, "YAT");
 });
 
 test("SCANS: slug'lar tekil ve URL güvenli, kolonlar tanımlı", () => {

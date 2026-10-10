@@ -45,6 +45,15 @@ test("hazır taramalar: listeden açılır, tablo fon detayına bağlanır; bili
   expect((await page.request.get("/tarama/yok-boyle-tarama")).status()).toBe(404);
 });
 
+test("katılıma uygun fonlar taraması: seed'deki katılım fonu var, diğerleri yok", async ({ page, request }) => {
+  await page.goto("/tarama/katilim-fonlari");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Katılıma uygun fonlar");
+  const table = page.getByTestId("tarama-tablo");
+  await expect(table.getByRole("link", { name: /DDD BETA PORTFÖY ALTIN KATILIM FONU/ })).toBeVisible(); // seed: 11 mn ₺, aktif
+  await expect(table.getByRole("link", { name: /BBB/ })).toHaveCount(0);
+  expect(await (await request.get("/sitemap.xml")).text()).toContain("/tarama/katilim-bes-fonlari<");
+});
+
 test("sorgulu araç sayfaları noindex, sorgusuz hali index", async ({ page }) => {
   await page.goto("/portfoy?f=AAA:tl:1000");
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, follow");
