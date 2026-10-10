@@ -2,6 +2,7 @@
 import pg from "pg";
 import { readFileSync } from "node:fs";
 import { HDR, allocData, post, ymd } from "./tefas.mjs";
+import { evds } from "./evds.mjs";
 
 const KINDS = ["YAT", "EMK", "BYF", "GYF", "GSYF"];
 const addDays = (d, n) => new Date(d.getTime() + n * 864e5);
@@ -12,6 +13,27 @@ await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"
 if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece şema
 if (process.argv[2] === "vol") { await computeVol(); await db.end(); process.exit(0); } // sadece volatilite
 if (process.argv[2] === "bench") { await fetchBench(); await db.end(); process.exit(0); } // sadece benchmark
+if (process.argv[2] === "macro") { await fetchMacro(); await db.end(); process.exit(0); } // sadece TÜFE/mevduat
+
+// TÜFE ve TL mevduat faizi, TCMB EVDS'ten (EVDS_API_KEY yoksa atlanır). TÜİK 2026'da TÜFE'yi 2025=100 bazına taşıdı: eski seri
+// arşivde, ikisi de çekilip src/lib/macro.ts aylık değişimlerle zincirler. Mevduat serisi EVDS_MEVDUAT ile değiştirilebilir.
+async function fetchMacro() {
+  const MACRO = { TUFE_ESKI: "TP.FG.J0", TUFE: "TP.TUKFIY2025.GENEL", MEVDUAT: process.env.EVDS_MEVDUAT ?? "TP.TRY.MT01" };
+  const key = process.env.EVDS_API_KEY;
+  if (!key) return console.log("EVDS_API_KEY yok, TÜFE/mevduat atlandı");
+  const from = new Date(); from.setUTCFullYear(from.getUTCFullYear() - 6);
+  for (const [sym, series] of Object.entries(MACRO)) {
+    try {
+      const rows = await evds(series, from, new Date(), key);
+      if (rows.length)
+        await db.query(
+          `INSERT INTO macro SELECT $1, * FROM unnest($2::date[], $3::float8[]) ON CONFLICT (sym, date) DO UPDATE SET value = EXCLUDED.value`,
+          [sym, rows.map((r) => r.date), rows.map((r) => r.value)],
+        );
+      console.log("makro", sym, series, rows.length);
+    } catch (e) { console.log("makro alınamadı:", sym, e.message); } // ana ingest'i düşürmesin
+  }
+}
 
 // Yıllık volatilite: son 1 yılın günlük getiri std sapması x sqrt(252). Tüm fonlar tek geçişte, listeleme sayfası sadece okur.
 async function computeVol() {
@@ -108,4 +130,5 @@ for (const kind of KINDS) {
 }
 await computeVol();
 await fetchBench();
+await fetchMacro();
 await db.end();

@@ -24,3 +24,9 @@ INSERT INTO holdings_meta (code, disclosure_index, report, published) VALUES
 -- benchmark serileri (BIST100, USD, ALTIN), 401 gün
 INSERT INTO bench SELECT s, current_date - d, base * (1 + 0.001 * (400 - d) + 0.01 * sin(d))
 FROM (VALUES ('BIST100', 10000.0), ('USD', 30.0), ('ALTIN', 3000.0)) v(s, base), generate_series(0, 400) d;
+
+-- makro (TCMB EVDS): aylık %3 TÜFE; eski baz (2003=100) 20-6 ay önce, yeni baz (2025=100) son 7 ay (zincirleme sınanır);
+-- haftalık %45 mevduat faizi. Ay sonu tarihli; son açıklanan ay = geçen ay.
+INSERT INTO macro SELECT 'TUFE_ESKI', (date_trunc('month', current_date) - make_interval(months => m) - interval '1 day')::date, 3000 * 1.03 ^ (20 - m) FROM generate_series(6, 20) m;
+INSERT INTO macro SELECT 'TUFE', (date_trunc('month', current_date) - make_interval(months => m) - interval '1 day')::date, 100 * 1.03 ^ (8 - m) FROM generate_series(1, 7) m;
+INSERT INTO macro SELECT 'MEVDUAT', current_date - 7 * w, 45 FROM generate_series(0, 60) w;

@@ -11,7 +11,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Fon listesi**: 2000'den fazla fon. Getiri (1G–5Y), büyüklük ve nakit giriş-çıkışı sekmeleri; sıralama, sonsuz kaydırma
 - **Filtreler**: arama, fon türü, kurucu (PYŞ), döviz/katılım/hisse yoğun/nitelikli fon, min büyüklük/yatırımcı, belirli bir hisseyi en az % X oranında tutan fonlar
 - **Fon detayı**: fiyat/büyüklük/yatırımcı grafiği, net nakit akışı, varlık dağılımı, risk (volatilite)
-- **Endekslere karşı**: BIST 100, USD/TRY ve gram altınla getiri kıyası; BIST 100 betası ve korelasyonu, kayan 3 aylık getiri dağılımı
+- **Endekslere karşı**: BIST 100, USD/TRY, gram altın, TÜFE ve TL mevduat faiziyle getiri kıyası; enflasyondan arındırılmış (reel) getiri; BIST 100 betası ve korelasyonu, kayan 3 aylık getiri dağılımı
 - **Rakipler ve örtüşme**: aynı kategorideki rakip fonlar, hisse portföyü en çok örtüşen fonlar
 - **Karşılaştırma**: en fazla 10 fon; 100'e endeksli grafik, getiri korelasyonu ve hisse örtüşme matrisi
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
@@ -51,6 +51,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **TEFAS**: yeni resmi JSON API (`/api/funds/fonGnlBlgSiraliGetir`, `/dagilimSiraliGetirT`). Auth ve scraper yok
 - **KAP**: haftalık/aylık Portföy Dağılım Raporu PDF'lerinden hisse ağırlıkları
 - **Yahoo Finance**: BIST 100, USD/TRY, gram altın (`bench` tablosu)
+- **TCMB EVDS**: TÜFE ve TL mevduat faizi (`macro` tablosu). Ücretsiz API anahtarı gerekir: `EVDS_API_KEY` (evds3.tcmb.gov.tr > Profilim > API Key). Yoksa atlanır; mevduat serisi `EVDS_MEVDUAT` ile değiştirilebilir (varsayılan `TP.TRY.MT01`)
 
 ### Proje yapısı
 
