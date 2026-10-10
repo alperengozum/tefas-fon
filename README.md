@@ -11,6 +11,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Fon listesi**: 2000'den fazla fon. Getiri (1G–5Y), büyüklük ve nakit giriş-çıkışı sekmeleri; sıralama, sonsuz kaydırma
 - **Filtreler**: arama, fon türü, kurucu (PYŞ), döviz/katılım/hisse yoğun/nitelikli fon, min büyüklük/yatırımcı, belirli bir hisseyi en az % X oranında tutan fonlar
 - **Fon detayı**: fiyat/büyüklük/yatırımcı grafiği, net nakit akışı, varlık dağılımı, risk (volatilite)
+- **Risk ve getiri kalitesi**: maks. düşüş ve toparlanma süresi, Sharpe/Sortino, kategorisindeki sırası, aylık/yıllık takvim getirileri; listede Risk sekmesi
 - **Endekslere karşı**: BIST 100, USD/TRY ve gram altınla getiri kıyası; BIST 100 betası ve korelasyonu, kayan 3 aylık getiri dağılımı
 - **Rakipler ve örtüşme**: aynı kategorideki rakip fonlar, hisse portföyü en çok örtüşen fonlar
 - **Karşılaştırma**: en fazla 10 fon; 100'e endeksli grafik, getiri korelasyonu ve hisse örtüşme matrisi

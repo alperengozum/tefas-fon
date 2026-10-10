@@ -41,3 +41,5 @@ ALTER TABLE kap_notif ADD COLUMN IF NOT EXISTS url text;
 -- KAP raporunun dönem sonundaki (hisse ağırlıklarıyla aynı gün) TEFAS varlık dağılımı; yeni rapor gelince sıfırlanır
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc jsonb;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc_date date;
+-- son 1 yılın en büyük düşüşü (%, ≤ 0): zirveden dibe; volatiliteyle aynı geçişte hesaplanır
+ALTER TABLE fund_vol ADD COLUMN IF NOT EXISTS mdd double precision;
