@@ -210,7 +210,7 @@ function FundTableView({ data }: { data: string }) {
             {rows.slice(0, limit).map((x) => (
               <TableRow key={x.code} className={`cursor-pointer ${pins.has(x.code) ? "bg-muted/50" : ""}`}
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("input,a,button")) return; // onay kutusu, pin ve kod bağlantısı kendi işini yapar
+                  if ((e.target as HTMLElement).closest("input,a,button")) return; // onay kutusu, pin ve hücre bağlantıları kendi işini yapar (sağ tık / orta tık / yeni sekme)
                   if (e.metaKey || e.ctrlKey) window.open(`/fon/${x.code}`, "_blank");
                   else location.href = `/fon/${x.code}`;
                 }}>
@@ -222,10 +222,10 @@ function FundTableView({ data }: { data: string }) {
                   </div>
                 </TableCell>
                 <TableCell className="font-medium"><a className="hover:underline" href={`/fon/${x.code}`}>{x.code}</a></TableCell>
-                <TableCell className="max-w-xs truncate" title={`${x.name}\n${x.founder}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge>{!x.active && <Badge variant="outline" className="ml-1 text-red-600">Pasif</Badge>}</TableCell>
-                {stockCol.length > 0 && <TableCell className="text-right font-medium tabular-nums">{byStock?.[x.code]?.toFixed(2)}%</TableCell>}
+                <TableCell className="max-w-xs" title={`${x.name}\n${x.founder}`}><a className="block truncate" href={`/fon/${x.code}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge>{!x.active && <Badge variant="outline" className="ml-1 text-red-600">Pasif</Badge>}</a></TableCell>
+                {stockCol.length > 0 && <TableCell className="text-right font-medium tabular-nums"><a className="block" href={`/fon/${x.code}`}>{byStock?.[x.code]?.toFixed(2)}%</a></TableCell>}
                 {cols.map((c) => (
-                  <TableCell key={c.key} className={`text-right tabular-nums ${c.color ? tone(x[c.key] as number) : ""}`}>{c.fmt(x[c.key])}</TableCell>
+                  <TableCell key={c.key} className={`text-right tabular-nums ${c.color ? tone(x[c.key] as number) : ""}`}><a className="block" href={`/fon/${x.code}`}>{c.fmt(x[c.key])}</a></TableCell>
                 ))}
               </TableRow>
             ))}
