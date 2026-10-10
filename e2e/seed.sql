@@ -2,6 +2,7 @@
 CREATE TEMP TABLE f (code text, kind text, name text, base double precision, drift double precision, alloc jsonb);
 INSERT INTO f VALUES
   ('AAA','YAT','ALFA PORTFÖY PARA PİYASASI (TL) FONU',       1.0, 0.0008, '{"hs":0,"r":0,"tr":95,"vm":5}'),
+  ('AAB','YAT','BETA PORTFÖY PARA PİYASASI FONU',            1.5, 0.0007, '{"tr":90,"vm":10}'),
   ('BBB','YAT','ALFA PORTFÖY HİSSE SENEDİ FONU',             2.0, 0.0012, '{"hs":90,"r":5,"vm":5}'),
   ('CCC','YAT','BETA PORTFÖY SERBEST (DÖVİZ) FON',           3.0, 0.0006, '{"hs":10,"r":40,"dt":50}'),
   ('DDD','YAT','BETA PORTFÖY ALTIN KATILIM FONU',            4.0, 0.0010, '{"km":90,"r":10}'),

@@ -13,18 +13,25 @@ if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece �
 if (process.argv[2] === "vol") { await computeVol(); await db.end(); process.exit(0); } // sadece volatilite
 if (process.argv[2] === "bench") { await fetchBench(); await db.end(); process.exit(0); } // sadece benchmark
 
-// Yıllık volatilite: son 1 yılın günlük getiri std sapması x sqrt(252). Tüm fonlar tek geçişte, listeleme sayfası sadece okur.
+// Yıllık volatilite: son 1 yılın günlük getiri std sapması x sqrt(252); en büyük düşüş: fiyatın o güne kadarki zirvesine
+// göre en düşük oranı (fiyat 0 = açıklanmadı, atlanır). Tüm fonlar tek geçişte, listeleme sayfası sadece okur.
 async function computeVol() {
   const c = await db.connect();
   try {
     await c.query("BEGIN");
     await c.query("SET LOCAL work_mem = '64MB'"); // sıralama diske taşmasın
-    await c.query(`INSERT INTO fund_vol (code, vol, updated)
-      SELECT code, stddev_samp(r) * sqrt(252) * 100, CURRENT_DATE FROM (
-        SELECT code, price / NULLIF(lag(price) OVER (PARTITION BY code ORDER BY date), 0) - 1 AS r
-        FROM info WHERE date > (SELECT max(date) FROM info) - 365) t
-      WHERE r IS NOT NULL GROUP BY code HAVING count(*) > 20
-      ON CONFLICT (code) DO UPDATE SET vol = EXCLUDED.vol, updated = EXCLUDED.updated`);
+    await c.query(`INSERT INTO fund_vol (code, vol, mdd, updated)
+      SELECT v.code, v.vol, d.mdd, CURRENT_DATE FROM (
+        SELECT code, stddev_samp(r) * sqrt(252) * 100 AS vol FROM (
+          SELECT code, price / NULLIF(lag(price) OVER (PARTITION BY code ORDER BY date), 0) - 1 AS r
+          FROM info WHERE date > (SELECT max(date) FROM info) - 365) t
+        WHERE r IS NOT NULL GROUP BY code HAVING count(*) > 20) v
+      LEFT JOIN (
+        SELECT code, min(price / peak - 1) * 100 AS mdd FROM (
+          SELECT code, price, max(price) OVER (PARTITION BY code ORDER BY date) AS peak
+          FROM info WHERE date > (SELECT max(date) FROM info) - 365 AND price > 0) t
+        GROUP BY code) d ON d.code = v.code
+      ON CONFLICT (code) DO UPDATE SET vol = EXCLUDED.vol, mdd = EXCLUDED.mdd, updated = EXCLUDED.updated`);
     await c.query("COMMIT");
   } catch (e) { await c.query("ROLLBACK"); throw e; } finally { c.release(); }
   console.log("volatilite güncellendi");

@@ -26,6 +26,7 @@ export function encodeFunds(funds: Fund[]): string {
     Math.round(f.price * 1e4) / 1e4, Math.round(f.size), f.investors, r2(f.stock), f.risk,
     ...RET.map((k) => r2(f[k])), ...FLOW.map((k) => (f[k] == null ? null : Math.round(f[k]!))),
     f.alloc ? Object.entries(f.alloc).flatMap(([k, v]) => [ai.get(k), r2(v)]) : null,
+    r2(f.vol), r2(f.mdd),
   ]);
   const out = JSON.stringify({ types, founders, assets, rows });
   memo.set(funds, out);
@@ -36,11 +37,14 @@ export function decodeFunds(json: string): FundRow[] {
   const { types, founders, assets = [], rows } = JSON.parse(json) as { types: string[]; founders: string[]; assets?: string[]; rows: any[][] };
   return rows.map((r) => {
     const f: any = { code: r[0], kind: "", name: r[1], type: types[r[2]], founder: founders[r[3]],
-      price: r[5], size: r[6], investors: r[7], stock: r[8], risk: r[9], vol: null };
+      price: r[5], size: r[6], investors: r[7], stock: r[8], risk: r[9] };
     FLAGS.forEach((k, i) => (f[k] = !!(r[4] & (1 << i))));
     RET.forEach((k, i) => (f[k] = r[10 + i]));
     FLOW.forEach((k, i) => (f[k] = r[10 + RET.length + i]));
-    const a: number[] | null = r[10 + RET.length + FLOW.length] ?? null;
+    const at = 10 + RET.length + FLOW.length;
+    const a: number[] | null = r[at] ?? null;
+    f.vol = r[at + 1] ?? null;
+    f.mdd = r[at + 2] ?? null;
     f.alloc = a && {};
     for (let i = 0; a && i < a.length; i += 2) f.alloc[assets[a[i]]] = a[i + 1];
     f.hay = fold(`${f.code} ${f.name}`);

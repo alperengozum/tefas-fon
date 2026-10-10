@@ -1,5 +1,6 @@
 import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
+import { median } from "./stats";
 
 // Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
@@ -11,7 +12,7 @@ export type Fund = {
   code: string; kind: string; name: string; price: number; size: number; investors: number;
   stock: number; active: boolean; alloc: Record<string, number> | null; // alloc: varlık dağılımı (%)
   founder: string; type: string; fx: boolean; islamic: boolean; qualified: boolean; stockFocus: boolean; oks: boolean;
-  vol: number | null; risk: number | null;
+  vol: number | null; risk: number | null; mdd: number | null; // mdd: son 1 yıl en büyük düşüş (%)
   d1: number | null; w1: number | null; m1: number | null; m3: number | null; m6: number | null; y1: number | null; y2: number | null; y3: number | null; y5: number | null; ytd: number | null;
   flow_w1: number | null; flow_m1: number | null; flow_m3: number | null;
 };
@@ -43,7 +44,7 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
      liq AS (SELECT DISTINCT code FROM kap_notif WHERE subject = 'Fon Tasfiye Duyurusu')
      SELECT c.code, c.kind, c.name, c.price, c.size, c.investors, ref.d::text AS ref,
             (c.date >= ref.d - ${ACTIVE_DAYS} AND liq.code IS NULL) AS active,
-            a.data AS alloc, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, ${rets}, ${flows}
+            a.data AS alloc, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, v.mdd, ${rets}, ${flows}
      FROM last JOIN info c ON c.code = last.code AND c.date = last.d CROSS JOIN ref
      ${joins}
      LEFT JOIN alloc a ON a.code = c.code
@@ -213,6 +214,14 @@ export const tickerFunds = cached(async (ticker: string): Promise<{ code: string
    WHERE h.ticker = $1 ORDER BY amount DESC NULLS LAST`,
   [ticker],
 )).rows, (t) => t);
+
+// Risksiz getiri yaklaşığı (Sharpe/Sortino için, yıllık oran): aktif TL para piyasası fonlarının 1Y getiri medyanı.
+// ponytail: TLREF/politika faizi serisi yok; PPF'ler gecelik faizi yakından izlediği için yeterli. Veri yoksa null.
+export async function riskFree(): Promise<number | null> {
+  const { funds } = await listFunds("YAT");
+  const m = median(funds.filter((f) => f.active && f.type === "Para Piyasası" && !f.fx && f.y1 != null).map((f) => f.y1!));
+  return m == null ? null : m / 100;
+}
 
 // Fonlarda geçen tüm hisse kodları (arama kutusunda öneri için)
 export const allTickers = cached(async (): Promise<string[]> =>
