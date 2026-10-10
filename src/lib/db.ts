@@ -1,5 +1,6 @@
 import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
+import { chainCpi, cpiDaily, depositDaily, type Obs } from "./macro";
 
 // Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
@@ -190,11 +191,25 @@ export const getFunds = cached(async (codes: string[]): Promise<{ funds: Detail[
 // Benchmark serileri (BIST100, USD, ALTIN), fon geçmişiyle aynı {date, price} biçiminde. Tablo boşsa {}.
 // TEFAS'ta D tarihli fon fiyatı bir önceki işlem gününün kapanışını yansıtır (AKU/BIST100 korelasyonu: gecikme 0'da 0.00,
 // -1'de 0.98), bu yüzden her endeks kapanışı bir sonraki işlem gününün tarihiyle etiketlenir; en son kapanış (henüz fon karşılığı yok) atılır.
+// TUFE ve MEVDUAT (macro tablosu, EVDS) günlük seriye çevrilip aynı sözlüğe eklenir; kaydırma yok, en güncel fon gününe kadar uzar.
 export const getBench = cached(async (): Promise<Record<string, { date: string; price: number }[]>> => {
-  const { rows } = await pool.query(`SELECT sym, date::text, price FROM bench ORDER BY sym, date`);
+  const [{ rows }, m, ref] = await Promise.all([
+    pool.query(`SELECT sym, date::text, price FROM bench ORDER BY sym, date`),
+    pool.query(`SELECT sym, date::text, value FROM macro ORDER BY sym, date`),
+    pool.query(`SELECT max(date)::text AS d FROM info`),
+  ]);
   const raw: Record<string, { date: string; price: number }[]> = {};
   for (const r of rows) (raw[r.sym] ??= []).push({ date: r.date, price: r.price });
-  return Object.fromEntries(Object.entries(raw).map(([s, h]) => [s, h.slice(0, -1).map((r, i) => ({ date: h[i + 1].date, price: r.price }))]));
+  const out = Object.fromEntries(Object.entries(raw).map(([s, h]) => [s, h.slice(0, -1).map((r, i) => ({ date: h[i + 1].date, price: r.price }))]));
+  const obs: Record<string, Obs[]> = {};
+  for (const r of m.rows) (obs[r.sym] ??= []).push({ date: r.date, value: r.value });
+  const to = ref.rows[0]?.d;
+  if (to) {
+    const cpi = cpiDaily(chainCpi(obs.TUFE_ESKI ?? [], obs.TUFE ?? []), to), dep = depositDaily(obs.MEVDUAT ?? [], to);
+    if (cpi.length) out.TUFE = cpi;
+    if (dep.length) out.MEVDUAT = dep;
+  }
+  return out;
 }, () => "b");
 
 // `code` fonuyla ortak hisse ağırlığı (Σ min) en yüksek fonlar

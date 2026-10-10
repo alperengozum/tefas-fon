@@ -237,6 +237,21 @@ test("fon detay: endekslere karşı tablo ve grafik", async ({ page }) => {
   for (const t of ["BIST 100", "USD/TRY", "Gram altın"]) await expect(page.getByRole("cell", { name: t })).toBeVisible();
 });
 
+test("fon detay: TÜFE ve mevduat satırları, reel getiri", async ({ page }) => {
+  await page.goto("/fon/BBB");
+  for (const t of ["TÜFE (enflasyon)", "TL mevduat (brüt)", "BBB reel (TÜFE'ye göre)"]) await expect(page.getByRole("cell", { name: t })).toBeVisible();
+  // seed: aylık %3 TÜFE -> 1 yılda ~%42.6; tablo hücresi ve reel özet sayı göstermeli
+  const tufe1y = page.locator("tr", { has: page.getByRole("cell", { name: "TÜFE (enflasyon)" }) }).locator("td").nth(6);
+  await expect(tufe1y).toHaveText(/^\+4[0-5]\.\d{2}%$/);
+  await expect(page.getByTestId("reel-ozet")).toContainText(/enflasyonu (geçti|geçemedi)/);
+  await expect(page.locator(".recharts-legend-item-text", { hasText: "TUFE" })).toBeVisible(); // legend kod gösterir, ad title'da
+});
+
+test("simülasyon: mevduata ve enflasyona karşı satırlar", async ({ page }) => {
+  await page.goto("/simulasyon?codes=AAA&monthly=1000");
+  for (const t of ["TL mevduat (brüt)", "TÜFE (enflasyon)"]) await expect(page.locator("tbody tr", { hasText: t })).toContainText("%");
+});
+
 test("hisse sayfası: hisseyi tutan fonlar; bilinmeyen hisse 404", async ({ page, request }) => {
   const codes = await holders(request);
   test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");

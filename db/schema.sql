@@ -41,3 +41,5 @@ ALTER TABLE kap_notif ADD COLUMN IF NOT EXISTS url text;
 -- KAP raporunun dönem sonundaki (hisse ağırlıklarıyla aynı gün) TEFAS varlık dağılımı; yeni rapor gelince sıfırlanır
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc jsonb;
 ALTER TABLE holdings_meta ADD COLUMN IF NOT EXISTS alloc_date date;
+-- makro seriler (TCMB EVDS, ingest macro): TUFE_ESKI/TUFE ay sonu endeksi (2003=100 / 2025=100), MEVDUAT TL mevduat faizi (yıllık %)
+CREATE TABLE IF NOT EXISTS macro (sym text NOT NULL, date date NOT NULL, value double precision NOT NULL, PRIMARY KEY (sym, date));

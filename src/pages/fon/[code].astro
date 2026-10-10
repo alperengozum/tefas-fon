@@ -6,6 +6,7 @@ import PinButton from "../../components/PinButton";
 import { getBench, getFund, getFunds, getHoldings, getNews, overlapping, peers } from "../../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../../lib/analytics";
 import { beta, corr, dailyReturns, rolling } from "../../lib/stats";
+import { real } from "../../lib/macro";
 import { label, pct, price, tl, tone, trDate } from "../../lib/format";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
@@ -18,6 +19,7 @@ const since = new Date(new Date(last.date).getTime() - 365 * 864e5).toISOString(
 const fr = dailyReturns(f.history, since), br = bench.BIST100 ? dailyReturns(bench.BIST100, since) : null;
 const [b100, c100] = br ? [beta(fr, br), corr(fr, br)] : [null, null];
 const roll = rolling(f.history, 91);
+const real1y = bench.TUFE ? real(ret(f.history, 365), ret(bench.TUFE, 365)) : null;
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o && last.price ? (last.shares - o.shares) * last.price : null; };
 const [rivals, { holdings, report, published, note, seen }, overl, news] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6), getNews(f.code)]);
@@ -64,7 +66,8 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
 
   {benches.length > 0 && (
     <section class="mb-8">
-      <h2 class="mb-3 font-semibold">Endekslere karşı <span class="text-xs font-normal text-muted-foreground">BIST 100, USD/TRY, gram altın (Yahoo Finance) · fon bunları geçti mi?</span></h2>
+      <h2 class="mb-3 font-semibold">Endekslere karşı <span class="text-xs font-normal text-muted-foreground">BIST 100, USD/TRY, gram altın (Yahoo Finance){bench.TUFE && ", TÜFE ve mevduat faizi (TCMB EVDS)"} · fon bunları geçti mi?</span></h2>
+      {real1y != null && <p class="mb-3 text-sm" data-testid="reel-ozet">Son 1 yılda enflasyondan arındırılmış (reel) getiri <b class={tone(real1y)}>{pct(real1y)}</b>: fon enflasyonu {real1y >= 0 ? "geçti" : "geçemedi"}.</p>}
       <div class="mb-3 overflow-x-auto rounded-lg border">
         <table class="w-full text-sm tabular-nums">
           <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left"></th>{RETURNS.map(([k]) => <th class="p-2">{k}</th>)}</tr></thead>
@@ -72,9 +75,13 @@ const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
             {[[f.code, f.history] as const, ...benches.map(([s, l]) => [l, bench[s]] as const)].map(([l, h], i) => (
               <tr class={`border-t ${i === 0 ? "font-medium" : ""}`}><td class="p-2 text-left">{l}</td>{RETURNS.map(([, d]) => { const r = ret(h, d); return <td class={`p-2 text-right ${tone(r)}`}>{pct(r)}</td>; })}</tr>
             ))}
+            {bench.TUFE && (
+              <tr class="border-t bg-muted/30 font-medium"><td class="p-2 text-left">{f.code} reel (TÜFE'ye göre)</td>{RETURNS.map(([, d]) => { const r = real(ret(f.history, d), ret(bench.TUFE, d)); return <td class={`p-2 text-right ${tone(r)}`}>{pct(r)}</td>; })}</tr>
+            )}
           </tbody>
         </table>
       </div>
+      {bench.TUFE && <p class="mb-3 text-xs text-muted-foreground">TÜFE ay içinde geometrik dağıtılır, henüz açıklanmamış ay son aylık enflasyonla tahmin edilir. Mevduat: TCMB haftalık TL mevduat faizi, günlük işletilmiş, stopaj öncesi.</p>}
       {b100 != null && <p class="mb-3 text-sm text-muted-foreground">BIST 100'e göre beta <b class="text-foreground">{b100.toFixed(2)}</b> · korelasyon <b class="text-foreground">{c100?.toFixed(2)}</b> <span class="text-xs">(son 1 yıl, günlük getiriler; beta 1'den küçükse endeksten az oynak)</span></p>}
       <CompareChart client:only="react" series={[{ code: f.code, name: f.name, history: forChart(f.history, ["price"]) }, ...benches.map(([s, l]) => ({ code: s, name: l, history: forChart(bench[s], ["price"]) }))]} />
     </section>
