@@ -23,7 +23,7 @@ const rows = [
 ];
 const missing = codes.filter((c) => !funds.some((f) => f.code === c));
 ---
-<Base title="Simülasyon · TEFAS Fon Analiz">
+<Base title="Simülasyon · TEFAS Fon Analiz" description="Geçmişte şu fonu alsaydım ne olurdu? Aylık düzenli alım (XIRR) ve tek seferlik alım simülasyonu, endekslerle kıyaslı." noindex={Astro.url.search !== ""}>
   <h1 class="mb-1 text-xl font-semibold">Yatırım simülasyonu</h1>
   <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; vergi ve fon masrafı ayrıca hesaba katılmaz (fiyata zaten yansır).</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">

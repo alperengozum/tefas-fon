@@ -58,7 +58,7 @@ const ovl = funds.map((a) => funds.map((b) => { const x = holdings.get(a.code), 
 const hasOvl = ovl.some((r, i) => r.some((v, j) => i !== j && v != null));
 const initial = entered.map((e) => ({ code: e.code, mode: e.mode, value: String(e.value) }));
 ---
-<Base title="Portföyüm · TEFAS Fon Analiz">
+<Base title="Portföyüm · TEFAS Fon Analiz" description="Fon portföyünüzü kurun: birleşik varlık dağılımı, hisse maruziyeti, fonlar arası örtüşme ve geçmiş performans." noindex={Astro.url.search !== ""}>
   <h1 class="mb-1 text-xl font-semibold">Portföyüm</h1>
   <p class="mb-4 text-sm text-muted-foreground">Fonlarını seç, tutar (₺) ya da adet (pay) gir; birleşik varlık dağılımı, hisse maruziyeti ve fonlar arası örtüşme çıkar. Kayıt yalnız bu tarayıcıda tutulur; adres paylaşılabilir.</p>
   <PortfolioForm client:only="react" initial={initial} />

@@ -44,8 +44,12 @@ const why = holdings.length || stockPct <= 0 ? null
 const top = rivals.slice(0, 4).map((r) => r.code);
 const cmp = top.length ? (await getFunds([f.code, ...top])).funds : [];
 const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
+const KIND_NAME: Record<string, [string, string]> = { YAT: ["Yatırım Fonları", "/fonlar/yat"], EMK: ["Emeklilik Fonları", "/fonlar/bes"], BYF: ["Borsa Yatırım Fonları", "/fonlar/byf"], GYF: ["Gayrimenkul Yatırım Fonları", "/fonlar/gyf"] };
 ---
-<Base title={`${f.code} · TEFAS Fon Analiz`}>
+<Base title={`${f.code} ${f.name} · TEFAS Fon Analiz`}
+  description={`${f.code} ${f.name}: fiyat ${price(last.price)}, 1 yıllık getiri ${pct(ret(f.history, 365))}, büyüklük ${tl(last.size)}, ${last.investors?.toLocaleString("tr-TR") ?? "–"} yatırımcı (${trDate(last.date)}). Getiri, risk, varlık dağılımı, hisse portföyü ve rakipler.`}
+  image={`/og/fon/${f.code}.png`} path={`/fon/${f.code}`}
+  crumbs={[{ name: KIND_NAME[f.kind]?.[0] ?? "Fonlar", path: KIND_NAME[f.kind]?.[1] ?? "/fonlar/yat" }, { name: f.code, path: `/fon/${f.code}` }]}>
   <div class="mb-6">
     <div class="text-sm text-muted-foreground">{f.kind} · {trDate(last.date)} · {f.active ? "TEFAS'ta aktif" : <span class="font-medium text-red-600">TEFAS'ta pasif {f.tasfiye ? `(tasfiye duyurusu: ${trDate(f.tasfiye)})` : `(son veri ${trDate(last.date)})`}</span>}</div>
     <h1 class="break-words text-xl font-semibold sm:text-2xl">{f.code} <span class="text-base font-normal sm:text-lg text-muted-foreground">{f.name}</span></h1>

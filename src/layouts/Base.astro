@@ -1,6 +1,12 @@
 ---
 import "../styles/global.css";
-const { title = "TEFAS Fon Analiz" } = Astro.props;
+import { abs, jsonLd, SITE_DESC, SITE_NAME, type Crumb } from "../lib/seo";
+// description/image: sayfaya özel paylaşım metni ve görseli; crumbs: JSON-LD BreadcrumbList; noindex: sorgu parametreli araç sayfaları
+// path: kanonik yol (ör. /fon/aaa -> /fon/AAA); verilmezse istek yolu, sorgu parametresiz
+type Props = { title?: string; description?: string; image?: string; crumbs?: Crumb[]; noindex?: boolean; path?: string };
+const { title = SITE_NAME, description = SITE_DESC, image = "/og-image.png", crumbs = [], noindex = false, path: canonPath = Astro.url.pathname } = Astro.props as Props;
+const canonical = abs(Astro.site, canonPath);
+const img = abs(Astro.site, image);
 const tabs = [["yat", "Yatırım Fonları"], ["bes", "Emeklilik (BES)"], ["byf", "BYF"], ["gyf", "GYF"]];
 const path = Astro.url.pathname;
 const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
@@ -11,6 +17,25 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="/favicon.svg" />
     <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? "noindex, follow" : "index, follow"} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={img} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="tr_TR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={img} />
+    <script type="application/ld+json" set:html={jsonLd(Astro.site, { path: canonPath, title, description }, crumbs)} />
     <slot name="head" />
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
@@ -37,7 +62,7 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
           {tabs.map(([k, l]) => (
             <a href={`/fonlar/${k}`} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
           ))}
-          {[["/karsilastir", "Karşılaştır"], ["/hisse", "Hisse Ara"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"]].map(([h, l]) => (
+          {[["/tarama", "Taramalar"], ["/karsilastir", "Karşılaştır"], ["/hisse", "Hisse Ara"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"]].map(([h, l]) => (
             <a href={h} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
           ))}
         </div>
