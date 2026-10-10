@@ -289,6 +289,38 @@ test("portföy: seçicilerle tutar ve adet gir, birleşik analiz, tarayıcıda h
   await expect(page.getByTestId("portfoy-satir")).toHaveCount(2);
 });
 
+test("simülasyon: stopaj sonrası net sütunları (fon %17,5 / hisse yoğun yok, endekste boş)", async ({ page }) => {
+  await page.goto("/simulasyon?codes=AAA&monthly=1000");
+  const fund = page.locator("tbody tr").first();
+  await expect(fund).toContainText("AAA");
+  const lump = await fund.locator("td").nth(7).innerText(), netLump = await fund.locator('[data-col="net-lump"]').innerText();
+  const n = (s) => Number(s.replace("%", "").replace("+", ""));
+  expect(n(netLump)).toBeCloseTo(n(lump) * 0.825, 1); // PPF: %17,5 stopaj, kazançlı
+  await expect(fund.locator('[data-col="net-lump"]')).toHaveAttribute("title", "stopaj %17.5");
+  await expect(fund.locator('[data-col="net-sip"]')).toHaveText(/^[+-]\d+\.\d{2}%$/);
+  await expect(page.locator("tbody tr", { hasText: "BIST 100" }).locator('[data-col="net-sip"]')).toHaveText("–");
+  await expect(page.getByTestId("stopaj-not")).toContainText("%17,5");
+});
+
+test("portföy: hedef % ile yeniden dengeleme ve portföy riski", async ({ page }) => {
+  await page.goto("/portfoy?f=AAA:tl:7000:50&f=BBB:tl:3000:50");
+  const risk = page.locator('[data-section="portfoy-risk"]');
+  await expect(risk.getByText("Volatilite (yıllık)")).toBeVisible();
+  await expect(page.locator("thead th", { hasText: "Risk katkısı" })).toBeVisible();
+  const reb = page.locator('[data-section="dengeleme"]');
+  await expect(reb.locator("tr", { hasText: "AAA" })).toContainText("Sat 2 B ₺");
+  await expect(reb.locator("tr", { hasText: "BBB" })).toContainText("Al 2 B ₺");
+  await expect(reb.locator("tbody tr").first().locator("td").last()).toHaveText("50.0%");
+  // satış yapmadan + ek nakit: formdan gönder
+  await page.getByLabel("Ek nakit (₺)").fill("1000");
+  await page.getByLabel("Satış yapmadan").check();
+  await page.getByRole("button", { name: "Analiz et" }).click();
+  await expect(page).toHaveURL(/nakit=1000.*satma=1/);
+  await expect(page.getByLabel("Hedef % 1")).toHaveValue("50");
+  await expect(reb.locator("tr", { hasText: "AAA" })).toContainText("–"); // fazla olana dokunulmaz
+  await expect(reb.locator("tr", { hasText: "BBB" })).toContainText("Al 1 B ₺");
+});
+
 test("simülasyon: çoklu fon seçici çip ekler/çıkarır, form ?codes= gönderir", async ({ page, request }) => {
   const codes = await holders(request);
   test.skip(codes.length < 2, "DB'de EREGL portföy verisi yok");

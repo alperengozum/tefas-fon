@@ -15,8 +15,8 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Rakipler ve örtüşme**: aynı kategorideki rakip fonlar, hisse portföyü en çok örtüşen fonlar
 - **Karşılaştırma**: en fazla 10 fon; 100'e endeksli grafik, getiri korelasyonu ve hisse örtüşme matrisi
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
-- **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans. Adresi paylaşılabilir
-- **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı
+- **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans, portföy volatilitesi ve fon başına risk katkısı, hedef ağırlıklara göre yeniden dengeleme (ek nakit / satış yapmadan). Adresi paylaşılabilir
+- **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı; stopaj sonrası net getiri
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
