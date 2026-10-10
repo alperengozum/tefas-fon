@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
 import { decodeFunds } from "../lib/compact";
 import { fold } from "../lib/classify";
+import { type AssetRule, assetName, assetOptions, matches, ruleText, share } from "../lib/assets";
 import { label, pct, price, tl, tone } from "../lib/format";
 import { usePins } from "../lib/pins";
 import { PinToggle } from "./PinButton";
@@ -29,17 +30,22 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
   { key: "qualified", name: "Nitelikli / Özel" }, { key: "oks", name: "OKS" },
 ];
 
-const EMPTY = { q: "", status: "aktif", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "" };
+const EMPTY = { q: "", status: "aktif", type: "", founder: "", cat: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "", assets: [] as AssetRule[] };
+// "Tüm Filtreler" paneli kapalıyken de kaç filtrenin açık olduğu görünsün
+const PANEL = ["cat", "riskMin", "riskMax", "invMin", "invMax", "sizeMin", "sizeMax", "stockMin"] as const;
+// Sıralama anahtarı: Fund alanı veya "@<varlık>" (varlık kuralı sütunu, ör. "@g:mevduat")
+type SortKey = keyof Fund | `@${string}`;
+const val = (x: Fund, k: SortKey): any => (k.startsWith("@") ? (x.alloc ? share(x.alloc, k.slice(1)) : null) : x[k as keyof Fund]);
 const ALL = "__all"; // base-ui boş string değerini "seçim yok" sayar; "hepsi" için sabit değer kullan
 
 // Sayfa içinde çizilen (shadcn/base-ui) seçim kutusu; doğal <select> açılır listesi yerine.
-function Pick({ value, onChange, all, items, className }: { value: string; onChange: (v: string) => void; all: string; items: { value: string; label: string }[]; className?: string }) {
+function Pick({ value, onChange, all, items, className }: { value: string; onChange: (v: string) => void; all: string; items: { value: string; label: string; sub?: boolean }[]; className?: string }) {
   const list = [{ value: ALL, label: all }, ...items];
   return (
     <Select items={list} value={value || ALL} onValueChange={(v) => onChange(v === ALL ? "" : String(v))}>
       <SelectTrigger className={className}><SelectValue /></SelectTrigger>
       <SelectContent className="max-h-72" alignItemWithTrigger={false}>
-        {list.map((i) => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
+        {list.map((i) => <SelectItem key={i.value} value={i.value} className={"sub" in i && i.sub ? "pl-6 text-muted-foreground" : ""}>{i.label}</SelectItem>)}
       </SelectContent>
     </Select>
   );
@@ -61,7 +67,9 @@ function FundTableView({ data }: { data: string }) {
   const [view, setView] = useState("getiri");
   const [f, setF] = useState(EMPTY);
   const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
-  const [sort, setSort] = useState<{ key: keyof Fund; dir: 1 | -1 }>({ key: "size", dir: -1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "size", dir: -1 });
+  // varlık kuralı taslağı (Ekle'ye basılınca f.assets'e geçer)
+  const [draft, setDraft] = useState({ a: "", op: "has" as AssetRule["op"], min: "" });
   const [limit, setLimit] = useState(100);
   // Sonsuz kaydırma: tablonun altındaki gözcü görününce +100 satır daha çiz
   const end = useRef<HTMLDivElement>(null);
@@ -85,6 +93,7 @@ function FundTableView({ data }: { data: string }) {
       types: uniq("type"), founders: uniq("founder"),
       cats: uniq("main").sort((a, b) => label(a).localeCompare(label(b), "tr")),
       flags: FLAGS.filter((fl) => funds.some((x) => x[fl.key])),
+      assets: assetOptions(new Set(funds.flatMap((x) => Object.keys(x.alloc ?? {})))),
     };
   }, [funds]);
 
@@ -103,9 +112,10 @@ function FundTableView({ data }: { data: string }) {
         (invMin == null || (x.investors ?? 0) >= invMin) && (invMax == null || (x.investors ?? 0) <= invMax) &&
         (sizeMin == null || x.size >= sizeMin * 1e6) && (sizeMax == null || x.size <= sizeMax * 1e6) &&
         (stockMin == null || x.stock >= stockMin) &&
+        df.assets.every((r) => matches(x.alloc, r)) &&
         (df.stock.trim().length < 2 || (byStock != null && x.code in byStock)))
       .sort((a, b) => {
-        const x = a[sort.key] as any, y = b[sort.key] as any;
+        const x = val(a, sort.key), y = val(b, sort.key);
         // pinlenen fonlar her sıralamada en üstte
         return +pins.has(b.code) - +pins.has(a.code) || (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
       });
@@ -128,7 +138,16 @@ function FundTableView({ data }: { data: string }) {
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
   const stockCol: Col[] = byStock && f.stock.trim().length >= 2 ? [{ key: "code", head: `${f.stock.toUpperCase()} %`, fmt: () => "" }] : [];
   const cols = VIEWS[view].cols;
-  const th = (key: keyof Fund, head: string, right = true) => (
+  // "içersin" kuralları tabloda sıralanabilir % sütunu olur
+  const assetCols = f.assets.filter((r) => r.op === "has");
+  const panelOn = PANEL.filter((k) => f[k]).length + f.assets.length;
+  const addRule = () => {
+    if (!draft.a) return;
+    const r: AssetRule = { a: draft.a, op: draft.op, min: draft.op === "has" ? Math.max(0, Number(draft.min) || 0) : 0 };
+    set({ assets: [...f.assets.filter((x) => x.a !== r.a), r] }); // aynı varlığa ikinci kural öncekinin yerine geçer
+    setDraft({ a: "", op: draft.op, min: "" });
+  };
+  const th = (key: SortKey, head: string, right = true) => (
     <TableHead key={key} className={`cursor-pointer select-none whitespace-nowrap ${right ? "text-right" : ""}`}
       onClick={() => setSort((s) => ({ key, dir: s.key === key ? (-s.dir as 1 | -1) : -1 }))}>
       {head}{sort.key === key ? (sort.dir === -1 ? " ↓" : " ↑") : ""}
@@ -166,7 +185,7 @@ function FundTableView({ data }: { data: string }) {
 
       {/* Tüm Filtreler */}
       <details className="rounded-lg border p-3">
-        <summary className="cursor-pointer text-sm font-medium">Tüm Filtreler</summary>
+        <summary className="cursor-pointer text-sm font-medium">Tüm Filtreler{panelOn > 0 && <Badge className="ml-2">{panelOn}</Badge>}</summary>
         <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1"><div className="text-muted-foreground">Baskın varlık</div>
             <Pick className="w-full" value={f.cat} onChange={(v) => set({ cat: v })} all="Tümü" items={opts.cats.map((c) => ({ value: c, label: label(c) }))} />
@@ -178,6 +197,33 @@ function FundTableView({ data }: { data: string }) {
           <div className="space-y-1"><div className="text-muted-foreground">Fon büyüklüğü (mn ₺)</div>
             <div className="flex items-center gap-2">{num("sizeMin", "Min")}–{num("sizeMax", "Maks")}</div></div>
           <div className="space-y-1"><div className="text-muted-foreground">TEFAS hisse ağırlığı en az (%)</div>{num("stockMin", "Örn. 50")}</div>
+          <div className="space-y-2 sm:col-span-2 lg:col-span-4">
+            <div className="text-muted-foreground">Varlık içeriği <span className="text-xs">(portföyünde şu varlık olan / olmayan fonlar; birden çok kural hepsi birlikte uygulanır)</span></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Pick className="w-full sm:w-64" value={draft.a} onChange={(v) => setDraft({ ...draft, a: v })} all="Varlık seçin…" items={opts.assets} />
+              <div className="flex rounded-md border p-0.5" role="group" aria-label="Kural">
+                {([["has", "İçersin"], ["not", "İçermesin"]] as const).map(([op, name]) => (
+                  <Button key={op} size="sm" variant={draft.op === op ? "default" : "ghost"} aria-pressed={draft.op === op} onClick={() => setDraft({ ...draft, op })}>{name}</Button>
+                ))}
+              </div>
+              {draft.op === "has" && (
+                <Input className="w-28" type="number" min={0} max={100} placeholder="en az %" value={draft.min}
+                  onChange={(e) => setDraft({ ...draft, min: e.target.value })} onKeyDown={(e) => e.key === "Enter" && addRule()} />
+              )}
+              <Button size="sm" variant={draft.a ? "default" : "outline"} disabled={!draft.a} onClick={addRule}>Kural ekle</Button>
+            </div>
+            {f.assets.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {f.assets.map((r) => (
+                  <Badge key={r.a} variant={r.op === "not" ? "destructive" : "secondary"} className="gap-1 pr-1">
+                    {ruleText(r)}
+                    <button type="button" className="rounded px-1 hover:bg-foreground/10" aria-label={`${ruleText(r)} kuralını kaldır`}
+                      onClick={() => set({ assets: f.assets.filter((x) => x !== r) })}>×</button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Risk değeri son 1 yılın günlük getiri volatilitesinden hesaplanır (resmi değer değildir). Aktif: fonun TEFAS'ta son 7 gün içinde veri yayımlaması ve KAP'ta tasfiye duyurusu olmaması; pasif fonlarda (tasfiye/birleşme) getiri ve nakit akışı gösterilmez. Yönetim ücreti, stopaj ve TEFAS işlem açık/kapalı bilgisi TEFAS API'sinde yok.
@@ -203,6 +249,7 @@ function FundTableView({ data }: { data: string }) {
               {th("code", "Kod", false)}
               {th("name", "Fon", false)}
               {stockCol.length > 0 && <TableHead className="text-right whitespace-nowrap">{stockCol[0].head}</TableHead>}
+              {assetCols.map((r) => th(`@${r.a}`, `${assetName(r.a)} %`))}
               {cols.map((c) => th(c.key, c.head))}
             </TableRow>
           </TableHeader>
@@ -224,6 +271,7 @@ function FundTableView({ data }: { data: string }) {
                 <TableCell className="font-medium"><a className="hover:underline" href={`/fon/${x.code}`}>{x.code}</a></TableCell>
                 <TableCell className="max-w-xs" title={`${x.name}\n${x.founder}`}><a className="block truncate" href={`/fon/${x.code}`}>{x.name} <Badge variant="secondary" className="ml-1">{x.type}</Badge>{!x.active && <Badge variant="outline" className="ml-1 text-red-600">Pasif</Badge>}</a></TableCell>
                 {stockCol.length > 0 && <TableCell className="text-right font-medium tabular-nums"><a className="block" href={`/fon/${x.code}`}>{byStock?.[x.code]?.toFixed(2)}%</a></TableCell>}
+                {assetCols.map((r) => <TableCell key={r.a} className="text-right font-medium tabular-nums"><a className="block" href={`/fon/${x.code}`}>{x.alloc ? `${share(x.alloc, r.a).toFixed(2)}%` : "–"}</a></TableCell>)}
                 {cols.map((c) => (
                   <TableCell key={c.key} className={`text-right tabular-nums ${c.color ? tone(x[c.key] as number) : ""}`}><a className="block" href={`/fon/${x.code}`}>{c.fmt(x[c.key])}</a></TableCell>
                 ))}

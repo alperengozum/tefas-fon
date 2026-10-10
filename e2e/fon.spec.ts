@@ -99,6 +99,31 @@ test("risk aralığı: min 2 > maks 1 boş liste verir", async ({ page }) => {
   await expect(rows(page)).toHaveCount(0);
 });
 
+test("varlık içeriği: içersin ≥ % sütun ekler, içermesin daraltır, çip ile kaldırılır", async ({ page }) => {
+  await ready(page);
+  const all = await total(page);
+  await page.getByText("Tüm Filtreler").click();
+  const rule = async (name: string, op: "İçersin" | "İçermesin", min?: string) => {
+    await page.locator("details [data-slot=select-trigger]", { hasText: "Varlık seçin…" }).click();
+    await page.getByRole("option", { name, exact: true }).click();
+    await page.getByRole("button", { name: op, exact: true }).click();
+    if (min) await page.getByPlaceholder("en az %").fill(min);
+    await page.getByRole("button", { name: "Kural ekle" }).click();
+  };
+  await rule("Hisse Senedi", "İçersin", "50");
+  await expect(page.locator("thead")).toContainText("Hisse Senedi %");
+  await expect.poll(() => total(page)).toBeLessThan(all);
+  const col = await page.locator("thead th").allInnerTexts().then((h) => h.findIndex((t) => t.startsWith("Hisse Senedi %")));
+  for (const v of await rows(page).locator(`td:nth-child(${col + 1})`).allInnerTexts()) expect(parseFloat(v)).toBeGreaterThanOrEqual(50);
+  await expect(page.locator("summary")).toContainText("1");
+  await page.getByRole("button", { name: /Hisse Senedi ≥ %50 kuralını kaldır/ }).click();
+  await expect(page.locator("thead")).not.toContainText("Hisse Senedi %");
+  await expect.poll(() => total(page)).toBe(all);
+  await rule("Hisse Senedi", "İçermesin");
+  await expect(page.getByText("Hisse Senedi içermesin")).toBeVisible();
+  await expect.poll(() => total(page)).toBeLessThan(all);
+});
+
 test("fon türü seçici listeyi daraltır", async ({ page }) => {
   await ready(page);
   const all = await total(page);

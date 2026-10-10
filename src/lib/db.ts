@@ -9,7 +9,7 @@ const pool = new pg.Pool({
 
 export type Fund = {
   code: string; kind: string; name: string; price: number; size: number; investors: number;
-  main: string | null; stock: number; active: boolean;
+  main: string | null; stock: number; active: boolean; alloc: Record<string, number> | null; // alloc: varlık dağılımı (%)
   founder: string; type: string; fx: boolean; islamic: boolean; qualified: boolean; stockFocus: boolean; oks: boolean;
   vol: number | null; risk: number | null;
   d1: number | null; w1: number | null; m1: number | null; m3: number | null; m6: number | null; y1: number | null; y2: number | null; y3: number | null; y5: number | null; ytd: number | null;
@@ -43,7 +43,7 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
      liq AS (SELECT DISTINCT code FROM kap_notif WHERE subject = 'Fon Tasfiye Duyurusu')
      SELECT c.code, c.kind, c.name, c.price, c.size, c.investors, ref.d::text AS ref,
             (c.date >= ref.d - ${ACTIVE_DAYS} AND liq.code IS NULL) AS active,
-            m.main, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, ${rets}, ${flows}
+            m.main, a.data AS alloc, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, ${rets}, ${flows}
      FROM last JOIN info c ON c.code = last.code AND c.date = last.d CROSS JOIN ref
      ${joins}
      LEFT JOIN alloc a ON a.code = c.code
