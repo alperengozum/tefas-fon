@@ -1,0 +1,13 @@
+---
+import Base from "../../layouts/Base.astro";
+import { SCANS } from "../../lib/scans";
+---
+<Base title="Hazır fon taramaları · TEFAS Fon Analiz" description="En çok kazandıran hisse fonları, düşük riskli yüksek getirili fonlar, en çok para girişi olan fonlar ve daha fazlası: TEFAS verisiyle güncel hazır taramalar.">
+  <h1 class="mb-1 text-xl font-semibold">Hazır taramalar</h1>
+  <p class="mb-4 text-sm text-muted-foreground">Sık sorulan sorular için önceden kurulmuş filtreler; her gün TEFAS verisiyle güncellenir.</p>
+  <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {SCANS.map((s) => (
+      <li><a class="block h-full rounded-lg border p-3 hover:bg-accent" href={`/tarama/${s.slug}`}><div class="font-medium">{s.title}</div><div class="mt-1 text-xs text-muted-foreground">{s.description}</div></a></li>
+    ))}
+  </ul>
+</Base>

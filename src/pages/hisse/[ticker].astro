@@ -8,7 +8,9 @@ const rows = ticker.length >= 2 ? await tickerFunds(ticker) : [];
 if (!rows.length) return new Response("Bu hisseyi tutan fon bulunamadı", { status: 404 });
 const total = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
 ---
-<Base title={`${ticker} hissesini tutan fonlar · TEFAS Fon Analiz`}>
+<Base title={`${ticker} hissesini tutan fonlar · TEFAS Fon Analiz`}
+  description={`${ticker} hissesini portföyünde tutan ${rows.length} yatırım fonu, ağırlıkları ve tahmini TL pozisyonları (KAP Portföy Dağılım Raporları).`}
+  crumbs={[{ name: "Hisse Ara", path: "/hisse" }, { name: ticker, path: `/hisse/${ticker}` }]}>
   <h1 class="mb-1 text-xl font-semibold">{ticker} <span class="text-base font-normal text-muted-foreground">hissesini tutan fonlar</span></h1>
   <p class="mb-4 text-sm text-muted-foreground">
     {rows.length} fon · tahmini toplam pozisyon <b class="text-foreground">{tl(total)}</b> (ağırlık × fon büyüklüğü; KAP raporu tarihindeki ağırlık, güncel büyüklük).

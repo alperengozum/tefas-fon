@@ -17,6 +17,8 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
 - **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans. Adresi paylaşılabilir
 - **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı
+- **Hazır taramalar**: en çok kazandıran hisse/BES fonları, düşük riskli yüksek getirili, en çok para girişi/çıkışı, en büyük, altın ve döviz fonları (`/tarama`, sunucuda çizilir)
+- **SEO / agent**: sayfa başına açıklama, canonical, Open Graph/Twitter kartı (fon başına dinamik görsel `/og/fon/KOD.png`), JSON-LD; DB'den `sitemap.xml`, AI tarayıcılarına açık `robots.txt`, agent'lar için `llms.txt`. Prod adresi `SITE_URL` (varsayılan canlı demo)
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
