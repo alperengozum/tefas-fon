@@ -3,12 +3,13 @@ import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import PinButton from "../../components/PinButton";
-import { getBench, getFund, getFunds, getHoldings, getHoldingsChange, getNews, listFunds, overlapping, peers, riskFree } from "../../lib/db";
+import { getBench, getFund, getFunds, getHoldings, getHoldingsChange, getNews, getReports, getStockPx, listFunds, overlapping, peers, riskFree } from "../../lib/db";
 import { BENCH, forChart, inBase, ret, RETURNS } from "../../lib/analytics";
 import { annualVol, beta, calendar, corr, dailyReturns, drawdown, rank, ratios, rolling } from "../../lib/stats";
 import { label, pct, price, tl, tone, trDate } from "../../lib/format";
 import { classify } from "../../lib/classify";
 import { slug } from "../../lib/founders";
+import { attribution } from "../../lib/attribution";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
 if (!f) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
@@ -45,6 +46,17 @@ const why = holdings.length || stockPct <= 0 ? null
   : f.name.startsWith("İŞ PORTFÖY") ? "İş Portföy raporları görüntü olarak yayımlanıyor (metin yok), okunamıyor."
   : seen ? "KAP portföy raporu bulundu ama tablo düzeni okunamadı."
   : "KAP'ta bu fon için portföy dağılım raporu bulunamadı.";
+// Hisse sepeti performansı: son rapor (bugüne kadar, açık dönem) ve bir önceki rapor (sonraki raporun dönem sonuna kadar, kapanmış dönem)
+const reports = holdings.length ? await getReports(f.code) : [];
+const px = reports.length
+  ? await getStockPx([...new Set(reports.flatMap((r) => r.weights.map((w) => w.ticker)))].sort(), new Date(new Date(reports[reports.length - 1].period).getTime() - 15 * 864e5).toISOString().slice(0, 10))
+  : {};
+const attrs = reports.map((r, i) => {
+  const next = reports[i - 1];
+  const until = next ? (f.history.find((h) => h.date > next.period)?.date ?? last.date) : last.date;
+  return { label: next ? `${r.report} → ${next.report}` : `${r.report} → bugün`, a: attribution({ weights: r.weights, period: r.period, until, fund: f.history, stocks: px, bench: bench.BIST100 }) };
+}).filter((x): x is { label: string; a: NonNullable<typeof x.a> } => x.a != null);
+const pp = (v: number | null) => (v == null ? "–" : `${v > 0 ? "+" : ""}${v.toFixed(2)}`); // yüzde puan
 const top = rivals.slice(0, 4).map((r) => r.code);
 const cmp = top.length ? (await getFunds([f.code, ...top])).funds : [];
 const alloc = Object.entries(f.alloc).sort((a, b) => b[1] - a[1]);
@@ -188,6 +200,41 @@ const KIND_NAME: Record<string, [string, string]> = { YAT: ["Yatırım Fonları"
             )
           ))}
           {!change.diff.added.length && !change.diff.removed.length && !change.diff.up.length && !change.diff.down.length && <p class="text-xs text-muted-foreground">Belirgin değişiklik yok.</p>}
+        </div>
+      )}
+      {attrs.length > 0 && (
+        <div class="mt-4 rounded-lg border p-3 text-sm" data-testid="sepet">
+          <div class="mb-2 font-medium">Hisse sepeti ve fonun gerçek getirisi <span class="text-xs font-normal text-muted-foreground">rapordaki hisse ağırlıkları dönem boyunca hiç değişmeseydi · temettü/bölünme düzeltmeli kapanışlar (Yahoo Finance)</span></div>
+          <div class="mb-2 overflow-x-auto">
+            <table class="w-full text-xs tabular-nums">
+              <thead class="text-right text-muted-foreground"><tr><th class="p-1.5 text-left font-normal">Dönem</th><th class="p-1.5 font-normal">Fon</th><th class="p-1.5 font-normal">Hisse sepeti</th><th class="p-1.5 font-normal">Sepetin fona katkısı</th><th class="p-1.5 font-normal">Fark (fon − katkı)</th><th class="p-1.5 font-normal">BIST 100</th><th class="p-1.5 font-normal">Sepet − BIST 100</th></tr></thead>
+              <tbody>
+                {attrs.map(({ label, a }) => (
+                  <tr class="border-t">
+                    <td class="p-1.5 text-left"><div class="font-medium">{label}</div><div class="text-muted-foreground">{trDate(a.start)} – {trDate(a.end)} · {a.days} gün</div></td>
+                    <td class={`p-1.5 text-right font-medium ${tone(a.fund)}`}>{pct(a.fund)}</td>
+                    <td class={`p-1.5 text-right ${tone(a.basket)}`}>{pct(a.basket)}</td>
+                    <td class={`p-1.5 text-right ${tone(a.contrib)}`}>{pp(a.contrib)} puan</td>
+                    <td class={`p-1.5 text-right font-medium ${tone(a.rest)}`}>{pp(a.rest)} puan</td>
+                    <td class={`p-1.5 text-right ${tone(a.bench)}`}>{pct(a.bench)}</td>
+                    <td class={`p-1.5 text-right ${tone(a.bench == null ? null : a.basket - a.bench)}`}>{a.bench == null ? "–" : `${pp(a.basket - a.bench)} puan`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(() => { const a = attrs[0].a, up = a.rows.filter((r) => r.contrib > 0).slice(0, 5), down = a.rows.filter((r) => r.contrib < 0).slice(0, 5); return (
+            <>
+              <div class="mb-1 text-xs text-muted-foreground">Hisse katkıları, yüzde puan · {attrs[0].label}</div>
+              {[["En çok katkı", up], ["En çok kayıp", down]].map(([k, rs]) => (rs as typeof up).length > 0 && (
+                <div class="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span class="w-24 shrink-0 text-xs text-muted-foreground">{k}</span>
+                  {(rs as typeof up).map((r) => <a class="hover:underline" href={`/hisse/${r.ticker}`} title={`ağırlık %${r.weight.toFixed(2)}, hisse getirisi ${pct(r.ret)}`}><b>{r.ticker}</b> <span class={`tabular-nums ${tone(r.contrib)}`}>{pp(r.contrib)}</span></a>)}
+                </div>
+              ))}
+              {a.covered < a.stockWeight - 0.5 && <p class="mt-1 text-xs text-muted-foreground">Fiyatı bulunamayan hisseler (ağırlık %{(a.stockWeight - a.covered).toFixed(1)}) hesaba katılmadı.</p>}
+            </>
+          ); })()}
+          <p class="mt-2 text-xs text-muted-foreground">Hisse sepeti: rapordaki hisselerin ağırlıklı getirisi. Sepetin fona katkısı: bu getirinin fon değerine yansıyan kısmı (ağırlık × getiri). Fark; hisse dışı varlıkların (repo, tahvil, mevduat) getirisini, dönem içindeki alım-satımları ve fon giderlerini birlikte gösterir. Hisse yoğun fonlarda büyük fark çoğunlukla dönem içi işlemlerden gelir. BIST 100 fiyat endeksidir (temettüsüz).</p>
         </div>
       )}
     </section>

@@ -33,3 +33,7 @@ INSERT INTO holdings_hist VALUES
   ('BBB', current_date - 10, '8. Ay 2026', 'EREGL', 6.5), ('BBB', current_date - 10, '8. Ay 2026', 'THYAO', 8.2),
   ('EEE', current_date - 40, '7. Ay 2026', 'EREGL', 5.0),
   ('EEE', current_date - 10, '8. Ay 2026', 'EREGL', 3.1), ('EEE', current_date - 10, '8. Ay 2026', 'ASELS', 2.4);
+
+-- hisse düzeltilmiş kapanışları (stock_px): fon detayındaki hisse sepeti performansı
+INSERT INTO stock_px SELECT t, current_date - d, base * (1 + drift * (400 - d))
+FROM (VALUES ('EREGL', 40.0, 0.001), ('THYAO', 300.0, 0.002), ('ASELS', 60.0, -0.0005)) v(t, base, drift), generate_series(0, 400) d;

@@ -47,3 +47,6 @@ ALTER TABLE fund_vol ADD COLUMN IF NOT EXISTS mdd double precision;
 -- Fon detayı ve hisse sayfası son iki raporu karşılaştırır (scripts/holdings.mjs yazar; 'gecmis' komutu bir önceki raporu doldurur)
 CREATE TABLE IF NOT EXISTS holdings_hist (code text NOT NULL, period date NOT NULL, report text NOT NULL, ticker text NOT NULL, weight double precision NOT NULL, PRIMARY KEY (code, period, ticker));
 CREATE INDEX IF NOT EXISTS holdings_hist_ticker ON holdings_hist (ticker);
+-- BIST hisse günlük düzeltilmiş kapanışları (Yahoo Finance adjclose: temettü + bölünme düzeltmeli), KAP portföyündeki hisseler için.
+-- Fonun hisse sepetinin rapor dönemindeki getirisi (src/lib/attribution.ts). scripts/stocks.mjs her çalışmada aralığı baştan yazar (düzeltme geriye dönük değişir)
+CREATE TABLE IF NOT EXISTS stock_px (ticker text NOT NULL, date date NOT NULL, close double precision NOT NULL, PRIMARY KEY (ticker, date));

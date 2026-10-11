@@ -3,6 +3,7 @@ import { classify, fold, riskOf } from "./classify";
 import { median } from "./stats";
 import { diffHoldings, type HoldDiff } from "./holdingsDiff";
 import { cached as lru } from "./cache";
+import { shiftNext } from "./attribution";
 
 // Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
@@ -207,6 +208,26 @@ export const getHoldingsChange = cached(async (code: string): Promise<{ cur: str
   const at = (p: string) => rows.filter((r) => r.period === p).map((r) => ({ ticker: r.ticker, weight: r.weight }));
   return { cur: rows.find((r) => r.period === periods[0]).report, prev: rows.find((r) => r.period === periods[1]).report, diff: diffHoldings(at(periods[1]), at(periods[0])) };
 }, (code) => code);
+
+// Fonun son iki KAP raporu (yeniden eskiye): dönem sonu ve hisse ağırlıkları. Hisse sepeti performansı için (lib/attribution).
+export const getReports = cached(async (code: string): Promise<{ period: string; report: string; weights: Holding[] }[]> => {
+  const { rows } = await pool.query(
+    `WITH p AS (SELECT DISTINCT period, report FROM holdings_hist WHERE code=$1 ORDER BY period DESC LIMIT 2)
+     SELECT p.period::text, p.report, h.ticker, h.weight FROM p JOIN holdings_hist h ON h.code=$1 AND h.period=p.period ORDER BY p.period DESC, h.weight DESC`, [code]);
+  const out = new Map<string, { period: string; report: string; weights: Holding[] }>();
+  for (const r of rows) (out.get(r.period) ?? out.set(r.period, { period: r.period, report: r.report, weights: [] }).get(r.period)!).weights.push({ ticker: r.ticker, weight: r.weight });
+  return [...out.values()];
+}, (code) => code);
+
+// Hisselerin düzeltilmiş kapanışları (stock_px), `since`ten itibaren; fon fiyatıyla aynı güne denk gelsin diye bir işlem günü
+// kaydırılmış (attribution.shiftNext). Hiç fiyat yoksa {}.
+export const getStockPx = cached(async (tickers: string[], since: string): Promise<Record<string, { date: string; price: number }[]>> => {
+  if (!tickers.length) return {};
+  const { rows } = await pool.query(`SELECT ticker, date::text, close FROM stock_px WHERE ticker = ANY($1) AND date >= $2::date ORDER BY ticker, date`, [tickers, since]);
+  const raw: Record<string, { date: string; price: number }[]> = {};
+  for (const r of rows) (raw[r.ticker] ??= []).push({ date: r.date, price: r.close });
+  return Object.fromEntries(Object.entries(raw).map(([t, h]) => [t, shiftNext(h)]));
+}, (tickers, since) => `${tickers.join(",")}|${since}`);
 
 // Bir hissenin fonlardaki son iki rapor ağırlığı: { kod: { prev, cur } } (cur null = son raporda çıkarmış). Geçmişi tek rapor olan fon yok.
 export const tickerChanges = cached(async (ticker: string): Promise<Record<string, { prev: number | null; cur: number | null; name: string }>> => {
