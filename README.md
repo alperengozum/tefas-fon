@@ -23,6 +23,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
+- **PWA ve tema**: ana ekrana eklenebilir (manifest, ikonlar), service worker ile daha önce açılan sayfalar çevrimdışı da açılır; Sistem / Açık / Koyu tema düğmesi (tarayıcıda hatırlanır, yazdırırken açık)
 
 ## Ekran görüntüleri
 

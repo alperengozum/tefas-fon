@@ -1,0 +1,12 @@
+---
+import Base from "../layouts/Base.astro";
+// Service worker'ın ağ yokken ve sayfa önbellekte de değilken gösterdiği sayfa. Derlemede statik üretilir (DB gerektirmez).
+export const prerender = true;
+---
+<Base title="Çevrimdışı · TEFAS Fon Analiz" description="İnternet bağlantısı yok." noindex>
+  <div class="mx-auto max-w-md py-16 text-center">
+    <h1 class="mb-2 text-xl font-semibold">Çevrimdışısın</h1>
+    <p class="mb-6 text-sm text-muted-foreground">Bu sayfa daha önce açılmadığı için çevrimdışı gösterilemiyor. Daha önce baktığın fon ve listeler bağlantı yokken de açılır (son görülen hâliyle).</p>
+    <button type="button" class="rounded-md border px-4 py-2 text-sm hover:bg-accent" onclick="location.reload()">Tekrar dene</button>
+  </div>
+</Base>

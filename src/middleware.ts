@@ -25,6 +25,7 @@ export function limited(ip: string, now = Date.now()): boolean {
 
 // Uygulamanın kendi işleme süresi: Server-Timing başlığına yazılır, 800ms üstü loga düşer (sunucu/ağ yavaşlığından ayırt etmek için).
 export const onRequest = defineMiddleware(async (ctx, next) => {
+  if (ctx.isPrerendered) return next(); // derleme zamanı (ör. /offline): istemci adresi yok, statik dosya olarak sunulur
   const ip = ctx.request.headers.get("cf-connecting-ip") ?? ctx.clientAddress;
   if (ip !== "127.0.0.1" && ip !== "::1" && limited(ip))
     return new Response("Çok fazla istek", { status: 429, headers: { "Retry-After": "10", ...SECURITY } });

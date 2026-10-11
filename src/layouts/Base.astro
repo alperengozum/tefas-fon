@@ -22,6 +22,31 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
     <link rel="canonical" href={canonical} />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#111111" media="(prefers-color-scheme: dark)" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Fon Analiz" />
+    <!-- Tema: localStorage "tema" = acik | koyu (yoksa sistem). Boyamadan önce çalışır (beyaz parlama olmasın). Yazdırırken her zaman açık. -->
+    <script is:inline>
+      (() => {
+        const root = document.documentElement, mq = matchMedia("(prefers-color-scheme: dark)");
+        const metas = [...document.querySelectorAll('meta[name="theme-color"]')];
+        const apply = () => {
+          let t = null;
+          try { t = localStorage.getItem("tema"); } catch {}
+          const dark = t === "koyu" || (t !== "acik" && mq.matches);
+          root.classList.toggle("dark", dark);
+          root.style.colorScheme = dark ? "dark" : "light";
+          metas.forEach((m, i) => (m.content = t ? (dark ? "#111111" : "#ffffff") : i ? "#111111" : "#ffffff"));
+        };
+        apply();
+        window.__tema = apply;
+        mq.addEventListener("change", apply);
+        addEventListener("storage", (e) => e.key === "tema" && apply());
+        addEventListener("beforeprint", () => { root.classList.remove("dark"); root.style.colorScheme = "light"; });
+        addEventListener("afterprint", apply);
+      })();
+    </script>
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE_NAME} />
     <meta property="og:title" content={title} />
@@ -66,6 +91,12 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
             <a href={h} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
           ))}
         </div>
+        <!-- data-tema istemcide doldurulur; simge sırası: sistem -> açık -> koyu -->
+        <button id="theme-toggle" type="button" data-tema="sistem" aria-label="Tema: sistem" title="Tema: sistem" class="group rounded p-2 hover:bg-accent sm:ml-auto">
+          <svg class="hidden group-data-[tema=sistem]:block" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
+          <svg class="hidden group-data-[tema=acik]:block" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+          <svg class="hidden group-data-[tema=koyu]:block" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+        </button>
       </nav>
     </header>
     <script>
@@ -77,6 +108,30 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
         links?.classList.toggle("hidden", open);
         links?.classList.toggle("flex", !open);
       });
+
+      const ORDER = ["sistem", "acik", "koyu"] as const;
+      const NAME = { sistem: "sistem", acik: "açık", koyu: "koyu" };
+      const theme = document.getElementById("theme-toggle")!;
+      const current = (): (typeof ORDER)[number] => {
+        try { const t = localStorage.getItem("tema"); return t === "acik" || t === "koyu" ? t : "sistem"; } catch { return "sistem"; }
+      };
+      const show = () => {
+        const t = current();
+        theme.dataset.tema = t;
+        theme.setAttribute("aria-label", `Tema: ${NAME[t]}`);
+        theme.title = `Tema: ${NAME[t]} (değiştirmek için tıkla)`;
+      };
+      show();
+      theme.addEventListener("click", () => {
+        const next = ORDER[(ORDER.indexOf(current()) + 1) % ORDER.length];
+        try { next === "sistem" ? localStorage.removeItem("tema") : localStorage.setItem("tema", next); } catch {}
+        (window as any).__tema?.();
+        show();
+      });
+      addEventListener("storage", (e) => e.key === "tema" && show());
+
+      // Service worker: sadece üretimde (dev'de Vite modüllerini önbelleğe almasın)
+      if (import.meta.env.PROD && "serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
     </script>
     <main class="mx-auto max-w-[1700px] px-3 py-4 sm:px-4 sm:py-6"><slot /></main>
     <footer class="no-print border-t mt-8 px-4 py-4 text-center text-xs text-muted-foreground">
