@@ -4,7 +4,9 @@ import FundPicker from "../components/FundCombobox";
 import { getFund } from "../lib/db";
 import { dailyReturns } from "../lib/stats";
 import { goalStats, seedOf, simulatePaths } from "../lib/goal";
-import { pct, tl } from "../lib/format";
+import { pct } from "../lib/format";
+// planlama sayfası: tam tutar (tl() "1,5 B" gibi yuvarlar)
+const money = (v: number | null | undefined) => (v == null || !isFinite(v) ? "–" : `${Math.round(v).toLocaleString("tr-TR")} ₺`);
 
 // ?fon=KOD&baslangic=0&aylik=5000&yil=10&hedef=1000000&enflasyon=30
 const q = Astro.url.searchParams;
@@ -47,12 +49,12 @@ const unit = inflPct ? "bugünün parasıyla" : "nominal TL";
       <p class="mb-3 text-sm" data-testid="hedef-varsayim">Varsayım: <b>{code}</b> son 1 yılda yıllık <b>{pct(annual)}</b> (nominal) getiri ve o yılın oynaklığı · değerler <b>{unit}</b>{inflPct ? ` (yıllık %${inflPct} enflasyon; aylık birikim enflasyonla artar)` : ""}.</p>
       <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="hedef-ozet">
         {[
-          ...(goal != null ? [["Hedefe ulaşma olasılığı", `%${Math.round(s.prob! * 100)}`, `${tl(goal)} · ${years} yıl`]] : []),
-          ["Medyan son değer", tl(end.p50), "senaryoların yarısı bunun üstünde"],
-          ["Kötü senaryo (%10)", tl(end.p10), "10 senaryodan 1'i bunun altında"],
-          ["İyi senaryo (%90)", tl(end.p90), "10 senaryodan 1'i bunun üstünde"],
-          ["Toplam birikim", tl(initial + monthly * years * 12), inflPct ? "ilk ayın tutarıyla (sonra enflasyonla artar)" : "yatırılan"],
-          ...(goal != null ? [["Hedef için aylık (%50)", tl(s.need50), "medyan senaryoda tutturur"], ["Hedef için aylık (%80)", tl(s.need80), "10 senaryodan 8'inde tutturur"]] : []),
+          ...(goal != null ? [["Hedefe ulaşma olasılığı", `%${Math.round(s.prob! * 100)}`, `${money(goal)} · ${years} yıl`]] : []),
+          ["Medyan son değer", money(end.p50), "senaryoların yarısı bunun üstünde"],
+          ["Kötü senaryo (%10)", money(end.p10), "10 senaryodan 1'i bunun altında"],
+          ["İyi senaryo (%90)", money(end.p90), "10 senaryodan 1'i bunun üstünde"],
+          ["Toplam birikim", money(initial + monthly * years * 12), inflPct ? "ilk ayın tutarıyla (sonra enflasyonla artar)" : "yatırılan"],
+          ...(goal != null ? [["Hedef için aylık (%50)", money(s.need50), "medyan senaryoda tutturur"], ["Hedef için aylık (%80)", money(s.need80), "10 senaryodan 8'inde tutturur"]] : []),
         ].map(([k, v, sub]) => (
           <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class="text-lg font-medium tabular-nums">{v}</div><div class="mt-1 text-xs text-muted-foreground">{sub}</div></div>
         ))}
@@ -63,7 +65,7 @@ const unit = inflPct ? "bugünün parasıyla" : "nominal TL";
           <table class="w-full text-sm tabular-nums" data-testid="hedef-yillar">
             <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Yıl</th><th class="p-2">Yatırılan</th><th class="p-2">Kötü (%10)</th><th class="p-2">Medyan</th><th class="p-2">İyi (%90)</th></tr></thead>
             <tbody>{shown.map((y) => (
-              <tr class={`border-t ${goal != null && y.year === years ? "font-medium" : ""}`}><td class="p-2 text-left">{y.year}</td><td class="p-2 text-right">{tl(initial + monthly * y.year * 12)}</td><td class="p-2 text-right">{tl(y.p10)}</td><td class="p-2 text-right">{tl(y.p50)}</td><td class="p-2 text-right">{tl(y.p90)}</td></tr>
+              <tr class={`border-t ${goal != null && y.year === years ? "font-medium" : ""}`}><td class="p-2 text-left">{y.year}</td><td class="p-2 text-right">{money(initial + monthly * y.year * 12)}</td><td class="p-2 text-right">{money(y.p10)}</td><td class="p-2 text-right">{money(y.p50)}</td><td class="p-2 text-right">{money(y.p90)}</td></tr>
             ))}</tbody>
           </table>
         </div>
