@@ -20,6 +20,8 @@ type Col = { key: keyof Fund; head: string; fmt: (v: any) => string; color?: boo
 const R = (key: keyof Fund, head: string): Col => ({ key, head, fmt: pct, color: true });
 const F = (key: keyof Fund, head: string): Col => ({ key, head, fmt: tl, color: true });
 const RISK: Col = { key: "risk", head: "Risk", fmt: (v) => v ?? "–" };
+// BYF: borsa fiyatının NAV'a göre primi; renksiz (prim alıcı için kötü, satıcı için iyi). Sadece verisi olan listede (BYF) Büyüklük görünümüne eklenir
+const PREM: Col = { key: "prem", head: "Prim/İskonto", fmt: pct };
 const VIEWS: Record<string, { name: string; cols: Col[] }> = {
   getiri: { name: "Getiri", cols: [R("d1", "1G"), R("w1", "1H"), R("m1", "1A"), R("m3", "3A"), R("m6", "6A"), R("ytd", "YBB"), R("y1", "1Y"), R("y2", "2Y"), R("y3", "3Y"), R("y5", "5Y"), RISK] },
   buyukluk: { name: "Büyüklük", cols: [{ key: "size", head: "Büyüklük", fmt: tl }, { key: "investors", head: "Yatırımcı", fmt: (v) => v?.toLocaleString("tr-TR") ?? "–" }, { key: "price", head: "Fiyat", fmt: price }, RISK] },
@@ -67,6 +69,7 @@ export default function FundTable({ src }: { src: string }) {
 
 function FundTableView({ data }: { data: string }) {
   const list = useMemo(() => decodeList(data), [data]);
+  const hasPrem = useMemo(() => list.funds.some((x) => x.prem != null), [list]);
   // TL / USD: USD seçiliyken getiri alanları USD/TRY'nin aynı vadeli getirisine göre çevrilir (sıralama ve filtre de çevrilmiş değerle)
   const [ccy, setCcy] = useState<"TL" | "USD">("TL");
   const usdOn = ccy === "USD" && !!list.usd;
@@ -152,7 +155,7 @@ function FundTableView({ data }: { data: string }) {
 
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY);
   const stockCol: Col[] = byStock && f.stock.trim().length >= 2 ? [{ key: "code", head: `${f.stock.toUpperCase()} %`, fmt: () => "" }] : [];
-  const cols = VIEWS[view].cols;
+  const cols = view === "buyukluk" && hasPrem ? [...VIEWS.buyukluk.cols.slice(0, -1), PREM, RISK] : VIEWS[view].cols;
   // "içersin" kuralları tabloda sıralanabilir % sütunu olur
   const assetCols = f.assets.filter((r) => r.op === "has");
   const panelOn = PANEL.filter((k) => f[k]).length + f.assets.length;

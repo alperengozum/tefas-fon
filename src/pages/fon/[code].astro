@@ -3,12 +3,14 @@ import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import PinButton from "../../components/PinButton";
+import PremiumChart from "../../components/PremiumChart";
 import { getBench, getFund, getFunds, getHoldings, getHoldingsChange, getNews, listFunds, overlapping, peers, riskFree } from "../../lib/db";
 import { BENCH, forChart, inBase, ret, RETURNS } from "../../lib/analytics";
 import { annualVol, beta, calendar, corr, dailyReturns, drawdown, rank, ratios, rolling } from "../../lib/stats";
 import { label, pct, price, tl, tone, trDate } from "../../lib/format";
 import { classify } from "../../lib/classify";
 import { slug } from "../../lib/founders";
+import { premiums, premiumStats } from "../../lib/premium";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
 if (!f) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
@@ -22,6 +24,8 @@ const since = new Date(new Date(last.date).getTime() - 365 * 864e5).toISOString(
 const fr = dailyReturns(f.history, since), br = bench.BIST100 ? dailyReturns(bench.BIST100, since) : null;
 const [b100, c100] = br ? [beta(fr, br), corr(fr, br)] : [null, null];
 const roll = rolling(f.history, 91);
+// BYF: borsa bülten fiyatı ile NAV farkı (son 1 yıl)
+const prem = f.kind === "BYF" ? premiumStats(f.history) : null;
 // Risk: son 1 yıl en büyük düşüş, Sharpe/Sortino (risksiz = PPF medyanı), kategori (aynı tür, aktif) içi sıra, takvim getirileri
 const [rf, { funds: listed }] = await Promise.all([riskFree(), listFunds(f.kind)]);
 const dd = drawdown(f.history, since);
@@ -83,6 +87,23 @@ const KIND_NAME: Record<string, [string, string]> = { YAT: ["Yatırım Fonları"
   </div>
 
   <section class="mb-8"><FundCharts client:only="react" history={forChart(f.history, ["price", "size", "investors"])} /></section>
+
+  {prem && (
+    <section class="mb-8" data-section="prim">
+      <h2 class="mb-3 font-semibold">Borsa fiyatı ve prim/iskonto <span class="text-xs font-normal text-muted-foreground">TEFAS borsa bülten fiyatı · NAV = fonun birim pay değeri · {trDate(prem.last.date)}</span></h2>
+      <div class="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        {[["Borsa fiyatı", price(prem.last.bprice)], ["NAV", price(prem.last.nav)], ["Prim/iskonto", pct(prem.last.prem)],
+          ["30 gün ort.", pct(prem.avg30)], ["1 yıl ort.", pct(prem.avg1y)], ["1 yıl aralık", `${pct(prem.min.prem)} / ${pct(prem.max.prem)}`]].map(([k, v]) => (
+          <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class="font-medium tabular-nums">{v}</div></div>
+        ))}
+      </div>
+      <p class="mb-3 text-sm text-muted-foreground">
+        {Math.abs(prem.last.prem) < 0.25 ? "Borsa fiyatı NAV'a çok yakın." : prem.last.prem > 0 ? `Borsada NAV'ın %${prem.last.prem.toFixed(2)} üstünde (primli) işlem görüyor: borsadan alan, fonun gerçek değerinden fazla öder.` : `Borsada NAV'ın %${Math.abs(prem.last.prem).toFixed(2)} altında (iskontolu) işlem görüyor: borsadan alan, fonun gerçek değerinden az öder.`}
+        {" "}Son 1 yılda NAV'dan ortalama sapma %{prem.absAvg1y?.toFixed(2)}{prem.absAvg1y != null && prem.absAvg1y > 1 ? " (yüksek: borsa fiyatı NAV'dan belirgin sapabiliyor)" : ""}.
+      </p>
+      <PremiumChart client:only="react" series={premiums(f.history, since)} />
+    </section>
+  )}
 
   {benches.length > 0 && (
     <section class="mb-8">

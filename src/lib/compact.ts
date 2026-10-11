@@ -29,7 +29,7 @@ export function encodeFunds(funds: Fund[], meta: ListMeta = {}): string {
     Math.round(f.price * 1e4) / 1e4, Math.round(f.size), f.investors, r2(f.stock), f.risk,
     ...RET.map((k) => r2(f[k])), ...FLOW.map((k) => (f[k] == null ? null : Math.round(f[k]!))),
     f.alloc ? Object.entries(f.alloc).flatMap(([k, v]) => [ai.get(k), r2(v)]) : null,
-    r2(f.vol), r2(f.mdd),
+    r2(f.vol), r2(f.mdd), r2(f.prem),
   ]);
   const out = JSON.stringify({ types, founders, assets, rows, ...meta });
   memo.set(funds, { key, out });
@@ -50,6 +50,7 @@ export function decodeList(json: string): { funds: FundRow[] } & ListMeta {
     const a: number[] | null = r[at] ?? null;
     f.vol = r[at + 1] ?? null;
     f.mdd = r[at + 2] ?? null;
+    f.prem = r[at + 3] ?? null;
     f.alloc = a && {};
     for (let i = 0; a && i < a.length; i += 2) f.alloc[assets[a[i]]] = a[i + 1];
     f.hay = fold(`${f.code} ${f.name}`);

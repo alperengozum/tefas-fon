@@ -17,6 +17,7 @@ export type Fund = {
   vol: number | null; risk: number | null; mdd: number | null; // mdd: son 1 yıl en büyük düşüş (%)
   d1: number | null; w1: number | null; m1: number | null; m3: number | null; m6: number | null; y1: number | null; y2: number | null; y3: number | null; y5: number | null; ytd: number | null;
   flow_w1: number | null; flow_m1: number | null; flow_m3: number | null;
+  prem: number | null; // BYF: borsa bülten fiyatının NAV'a göre primi (%, + primli / - iskontolu); diğer türlerde null
 };
 
 // vade adı -> kaç gün önceki fiyat (ytd ayrı: yıl başından önceki son gün)
@@ -46,7 +47,8 @@ async function queryFunds(kind: string): Promise<{ ref: string; funds: Fund[] }>
      liq AS (SELECT DISTINCT code FROM kap_notif WHERE subject = 'Fon Tasfiye Duyurusu')
      SELECT c.code, c.kind, c.name, c.price, c.size, c.investors, ref.d::text AS ref,
             (c.date >= ref.d - ${ACTIVE_DAYS} AND liq.code IS NULL) AS active,
-            a.data AS alloc, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, v.mdd, ${rets}, ${flows}
+            a.data AS alloc, COALESCE((a.data->>'hs')::float8, 0) AS stock, v.vol, v.mdd, ${rets}, ${flows},
+            CASE WHEN c.date >= ref.d - ${ACTIVE_DAYS} THEN (c.bprice / NULLIF(c.price, 0) - 1) * 100 END AS prem
      FROM last JOIN info c ON c.code = last.code AND c.date = last.d CROSS JOIN ref
      ${joins}
      LEFT JOIN alloc a ON a.code = c.code
@@ -89,14 +91,14 @@ const cached = <A extends unknown[], T>(fn: (...a: A) => Promise<T>, key: (...a:
 
 export type Detail = {
   code: string; name: string; kind: string;
-  history: { date: string; price: number; size: number; investors: number; shares: number }[];
+  history: { date: string; price: number; size: number; investors: number; shares: number; bprice?: number | null }[]; // bprice: BYF borsa bülten fiyatı
   alloc: Record<string, number>; allocDate: string | null;
   active?: boolean; tasfiye?: string | null; allocKap?: boolean; // sadece getFund doldurur
 };
 
 export const getFund = cached(async (code: string): Promise<Detail | null> => {
   const [h, a, ref, liq] = await Promise.all([
-    pool.query(`SELECT kind, name, date::text, price, size, investors, shares FROM info WHERE code=$1 ORDER BY date`, [code]),
+    pool.query(`SELECT kind, name, date::text, price, size, investors, shares, bprice FROM info WHERE code=$1 ORDER BY date`, [code]),
     // hisse portföyü varsa varlık dağılımı da KAP raporunun dönem sonundan (aynı güne ait olsun), yoksa son iş günü
     pool.query(`SELECT COALESCE(m.alloc_date, a.date)::text AS date, COALESCE(m.alloc, a.data) AS data, m.alloc IS NOT NULL AS kap
       FROM alloc a LEFT JOIN holdings_meta m ON m.code = a.code WHERE a.code=$1`, [code]),

@@ -47,3 +47,5 @@ ALTER TABLE fund_vol ADD COLUMN IF NOT EXISTS mdd double precision;
 -- Fon detayı ve hisse sayfası son iki raporu karşılaştırır (scripts/holdings.mjs yazar; 'gecmis' komutu bir önceki raporu doldurur)
 CREATE TABLE IF NOT EXISTS holdings_hist (code text NOT NULL, period date NOT NULL, report text NOT NULL, ticker text NOT NULL, weight double precision NOT NULL, PRIMARY KEY (code, period, ticker));
 CREATE INDEX IF NOT EXISTS holdings_hist_ticker ON holdings_hist (ticker);
+-- BYF borsa bülten fiyatı (TEFAS borsaBultenFiyat; diğer türlerde boş): NAV'a (price) göre prim/iskonto. 0 = işlem yok, null'a çevrilir
+ALTER TABLE info ADD COLUMN IF NOT EXISTS bprice double precision;

@@ -63,15 +63,32 @@ async function fetchBench() {
 async function save(kind, rows) {
   if (!rows.length) return;
   await db.query(
-    `INSERT INTO info (kind, code, name, date, price, shares, investors, size)
-     SELECT $1, * FROM unnest($2::text[], $3::text[], $4::date[], $5::float8[], $6::float8[], $7::int[], $8::float8[])
-     ON CONFLICT (code, date) DO UPDATE SET price=EXCLUDED.price, shares=EXCLUDED.shares, investors=EXCLUDED.investors, size=EXCLUDED.size`,
-    [kind, ...["fonKodu", "fonUnvan", "tarih", "fiyat", "tedPaySayisi", "kisiSayisi", "portfoyBuyukluk"].map((k) => rows.map((r) => r[k]))],
+    `INSERT INTO info (kind, code, name, date, price, shares, investors, size, bprice)
+     SELECT $1, c, n, d, p, s, i, z, NULLIF(b, 0) FROM unnest($2::text[], $3::text[], $4::date[], $5::float8[], $6::float8[], $7::int[], $8::float8[], $9::float8[]) AS t(c, n, d, p, s, i, z, b)
+     ON CONFLICT (code, date) DO UPDATE SET price=EXCLUDED.price, shares=EXCLUDED.shares, investors=EXCLUDED.investors, size=EXCLUDED.size, bprice=EXCLUDED.bprice`,
+    [kind, ...["fonKodu", "fonUnvan", "tarih", "fiyat", "tedPaySayisi", "kisiSayisi", "portfoyBuyukluk", "borsaBultenFiyat"].map((k) => rows.map((r) => r[k] ?? null))],
   );
 }
 
+// BYF borsa bülten fiyatı (bprice) sonradan eklendi: eski günler için BYF geçmişini bir kez yeniden çeker (~400 gün, ~15 istek, ~3 dk).
+// Sütunda hiç değer yoksa normal ingest başında kendiliğinden çalışır; "node scripts/ingest.mjs byf" zorla yeniden çeker.
+async function backfillByf(force = false) {
+  const { rows: [{ n, min }] } = await db.query("SELECT count(bprice)::int n, min(date)::text min FROM info WHERE kind='BYF'");
+  if (!min || (n && !force)) return;
+  const end = new Date();
+  for (let cur = new Date(Math.max(new Date(min).getTime(), addDays(end, -400).getTime())); cur <= end;) {
+    const to = new Date(Math.min(addDays(cur, 27).getTime(), end.getTime()));
+    const rows = await post("fonGnlBlgSiraliGetir", "BYF", cur, to);
+    await save("BYF", rows);
+    console.log("BYF bülten fiyatı", ymd(cur), ymd(to), rows.length);
+    cur = addDays(to, 1);
+  }
+}
+if (process.argv[2] === "byf") { await backfillByf(true); await db.end(); process.exit(0); }
+
 const days = Number(process.argv[2] ?? 400);
 const today = new Date();
+await backfillByf();
 for (const kind of KINDS) {
   const { rows: [{ max }] } = await db.query("SELECT max(date)::text FROM info WHERE kind=$1", [kind]);
   // son günü de yeniden çek: 10:00'da açıklamayan fonlar 12:00 turunda aynı tarihe eklensin (upsert)

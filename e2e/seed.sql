@@ -33,3 +33,7 @@ INSERT INTO holdings_hist VALUES
   ('BBB', current_date - 10, '8. Ay 2026', 'EREGL', 6.5), ('BBB', current_date - 10, '8. Ay 2026', 'THYAO', 8.2),
   ('EEE', current_date - 40, '7. Ay 2026', 'EREGL', 5.0),
   ('EEE', current_date - 10, '8. Ay 2026', 'EREGL', 3.1), ('EEE', current_date - 10, '8. Ay 2026', 'ASELS', 2.4);
+
+-- BYF borsa bülten fiyatı: NAV etrafında ±%0,6 dalgalanan prim, son gün +%0,5
+UPDATE info SET bprice = price * (1 + 0.006 * sin(current_date - date)) WHERE code = 'BYA';
+UPDATE info SET bprice = price * 1.005 WHERE code = 'BYA' AND date = current_date;

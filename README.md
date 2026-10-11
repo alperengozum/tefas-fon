@@ -13,6 +13,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Fon detayı**: fiyat/büyüklük/yatırımcı grafiği, net nakit akışı, varlık dağılımı, risk (volatilite)
 - **Risk ve getiri kalitesi**: maks. düşüş ve toparlanma süresi, Sharpe/Sortino, kategorisindeki sırası, aylık/yıllık takvim getirileri; listede Risk sekmesi
 - **Endekslere karşı**: BIST 100, USD/TRY ve gram altınla getiri kıyası; BIST 100 betası ve korelasyonu, kayan 3 aylık getiri dağılımı
+- **BYF prim/iskonto**: borsa yatırım fonlarında TEFAS borsa bülten fiyatının NAV'a göre primi; fon detayında son değer, 30 gün / 1 yıl ortalaması, aralık ve grafik, BYF listesinde (Büyüklük görünümü) sütun
 - **Rakipler ve örtüşme**: aynı kategorideki rakip fonlar, hisse portföyü en çok örtüşen fonlar
 - **Karşılaştırma**: en fazla 10 fon; 100'e endeksli grafik, getiri korelasyonu ve hisse örtüşme matrisi
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
@@ -92,6 +93,7 @@ npm run dev          # http://localhost:4321
 | `npm run build` / `npm start` | Üretim derlemesi ve sunucu |
 | `npm run ingest [gün]` | TEFAS verisini çek |
 | `npm run ingest -- vol` | Volatiliteyi yeniden hesapla |
+| `npm run ingest -- byf` | BYF borsa bülten fiyatlarını (~400 gün) yeniden çek; sütun boşsa normal ingest bunu bir kez kendisi yapar |
 | `npm run holdings` | KAP hisse portföylerini çek (her rapor `holdings_hist` geçmişine de yazılır) |
 | `npm run holdings -- gecmis` | Fonların bir önceki KAP raporunu indirip geçmişe yaz ("önceki rapora göre değişim" hemen dolsun; bir kez, yavaş) |
 | `npm test` | Birim testleri (PDF ayrıştırıcı, istatistik) |
