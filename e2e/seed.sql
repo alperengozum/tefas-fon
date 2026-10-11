@@ -8,6 +8,7 @@ INSERT INTO f VALUES
   ('DDD','YAT','BETA PORTFÖY ALTIN KATILIM FONU',            4.0, 0.0010, '{"km":90,"r":10}'),
   ('EEE','YAT','GAMA PORTFÖY DEĞİŞKEN FON',                  5.0, 0.0009, '{"hs":40,"r":40,"tr":20}'),
   ('EMA','EMK','TEST EMEKLİLİK VE HAYAT A.Ş. HİSSE SENEDİ EMEKLİLİK YATIRIM FONU', 6.0, 0.0011, '{"hs":80,"r":20}'),
+  ('EMD','EMK','TEST EMEKLİLİK VE HAYAT A.Ş. DEVLET KATKISI EMEKLİLİK YATIRIM FONU', 1.0, 0.0006, '{"dt":70,"r":30}'),
   ('BYA','BYF','ALFA PORTFÖY BORSA YATIRIM FONU',            7.0, 0.0010, '{"hs":100}'),
   ('GYA','GYF','GAMA GAYRİMENKUL YATIRIM FONU',              8.0, 0.0005, '{"gm":100}');
 
