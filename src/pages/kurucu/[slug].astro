@@ -9,7 +9,7 @@ const KINDS: [string, string, string][] = [["yat", "YAT", "Yatırım fonları"],
 const lists = await Promise.all(KINDS.map(([, k]) => listFunds(k)));
 const found = KINDS.map(([tur, , label], i) => ({ tur, label, ref: lists[i].ref, funds: lists[i].funds, stats: aggregate(lists[i].funds).find((r) => r.slug === Astro.params.slug) }))
   .filter((x) => x.stats);
-if (!found.length) return new Response("Kurucu bulunamadı", { status: 404 });
+if (!found.length) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
 const cur = found.find((x) => x.tur === Astro.url.searchParams.get("tur")) ?? found[0];
 const s = cur.stats!;
 const funds = cur.funds.filter((f) => f.active && f.founder === s.founder).sort((a, b) => b.size - a.size);

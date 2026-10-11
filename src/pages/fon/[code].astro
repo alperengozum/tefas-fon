@@ -11,7 +11,7 @@ import { classify } from "../../lib/classify";
 import { slug } from "../../lib/founders";
 
 const f = await getFund((Astro.params.code ?? "").toUpperCase());
-if (!f) return new Response("Fon bulunamadı", { status: 404 });
+if (!f) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
 const founder = classify(f.name, f.kind).founder;
 const TUR: Record<string, string> = { YAT: "yat", EMK: "bes", BYF: "byf", GYF: "gyf" };
 const last = f.history[f.history.length - 1];

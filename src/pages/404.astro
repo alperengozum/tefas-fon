@@ -1,0 +1,30 @@
+---
+import Base from "../layouts/Base.astro";
+// Sayfalar gövdesiz `new Response(null, { status: 404 })` döndürünce Astro buraya yönlendirir. DB'ye dokunmaz.
+const links = [["/fonlar/yat", "Yatırım fonları"], ["/fonlar/bes", "Emeklilik (BES) fonları"], ["/tarama", "Hazır taramalar"], ["/hisse", "Hisseyi tutan fonlar"], ["/kurucu", "Kurucular"]];
+---
+<Base title="Sayfa bulunamadı | TEFAS Fon Analiz" noindex>
+  <div class="mx-auto max-w-xl space-y-4 py-12 text-center">
+    <p class="text-sm font-medium text-muted-foreground">404</p>
+    <h1 class="text-2xl font-semibold">Sayfa bulunamadı</h1>
+    <p class="text-sm text-muted-foreground">
+      <code class="rounded bg-muted px-1.5 py-0.5">{Astro.url.pathname}</code> adresinde bir şey yok. Fon, kurucu ya da hisse kodu
+      yanlış yazılmış, fon tasfiye olup TEFAS'tan kalkmış olabilir.
+    </p>
+    <form id="fon-ara" class="mx-auto flex max-w-xs gap-2">
+      <input name="kod" required maxlength="5" placeholder="Fon kodu (ör. AAA)" aria-label="Fon kodu"
+        class="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm uppercase" />
+      <button class="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">Git</button>
+    </form>
+    <ul class="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm">
+      {links.map(([h, l]) => <li><a href={h} class="underline underline-offset-4 hover:text-foreground">{l}</a></li>)}
+    </ul>
+  </div>
+  <script>
+    document.getElementById("fon-ara")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const kod = new FormData(e.target as HTMLFormElement).get("kod")?.toString().trim().toUpperCase();
+      if (kod) location.href = `/fon/${encodeURIComponent(kod)}`;
+    });
+  </script>
+</Base>
