@@ -8,7 +8,7 @@ test("bilinmeyen adresler marka 404 sayfasını 404 koduyla gösterir, noindex",
     await expect(page.getByRole("heading", { name: "Sayfa bulunamadı" })).toBeVisible();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   }
-  await expect(page.getByRole("link", { name: "Yatırım fonları" })).toHaveAttribute("href", "/fonlar/yat");
+  await expect(page.getByRole("main").getByRole("link", { name: "Yatırım fonları" })).toHaveAttribute("href", "/fonlar/yat");
 });
 
 test("404 sayfasındaki fon kodu kutusu fon detayına götürür", async ({ page }) => {
