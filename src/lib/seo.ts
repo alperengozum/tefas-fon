@@ -43,7 +43,21 @@ Kimlik doğrulama yok, düz HTTP GET. Veri günde bir (10:00 ve 12:00) TEFAS'tan
 - [Portföy](${u("/portfoy")}): \`GET ${u("/portfoy?f=KOD:tl:5000&f=KOD:adet:120")}\`: tutar (tl) ya da pay adedi (adet); birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans (en fazla 15 satır)
 - [Simülasyon](${u("/simulasyon")}): \`GET ${u("/simulasyon?codes=KOD1,KOD2&monthly=5000&start=YYYY-MM-DD&end=YYYY-MM-DD")}\`: aylık düzenli alım (XIRR) ve tek seferlik alım, endekslerle kıyaslı (en fazla 6 fon)
 ${scans.length ? `\n## Hazır taramalar\n\n${scans.map((s) => `- [${s.title}](${u(`/tarama/${s.slug}`)}): ${s.description}`).join("\n")}\n` : ""}
-## API (JSON)
+## API (JSON, sürümlü: /api/v1)
+
+Agent'lar için önerilen uçlar. Alan adları İngilizce ve sabit; CORS açık; IP başına dakikada 60 istek. Belge: ${u("/api")}, OpenAPI: ${u("/api/v1/openapi.json")}
+
+- \`GET ${u("/api/v1/funds?kind={yat|bes|byf|gyf|all}&q=&type=&founder=&sort=y1&order=desc&limit=20&offset=0")}\`: fon arama/sıralama
+- \`GET ${u("/api/v1/funds/{KOD}?history=365")}\`: fon detayı (getiriler, endeks kıyası, risk, varlık dağılımı, hisse portföyü, isteğe bağlı fiyat geçmişi)
+- \`GET ${u("/api/v1/stocks/{HISSE}?min_weight=1")}\`: hisseyi tutan fonlar
+- \`GET ${u("/api/v1/compare?codes=KOD1,KOD2")}\`: 2-10 fon getirileri ve korelasyon
+- \`GET ${u("/api/v1/scans/{slug}")}\`: hazır tarama sonucu
+
+## MCP
+
+- \`${u("/mcp")}\`: MCP sunucusu (Streamable HTTP, durumsuz, POST). Araçlar: search_funds, get_fund, funds_holding_stock, compare_funds, run_scan
+
+## Sitenin iç uçları
 
 - \`GET ${u("/api/holdings?ticker=EREGL&min=1")}\`: hisseyi en az \`min\` % ağırlıkla tutan fonlar, \`{"FONKODU": ağırlık}\`. Ticker 2+ karakter, değilse \`{}\`
 - \`GET ${u("/api/funds/{yat|bes|byf|gyf|all}")}\`: fon listesi, sıkıştırılmış biçim \`{types, founders, assets, rows}\` (satırlar konumsal dizi; biçim sitenin kendi istemcisi içindir ve değişebilir, insan-okur içerik için /fon/{KOD} tercih edin)
