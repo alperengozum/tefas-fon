@@ -1,6 +1,7 @@
 import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
 import { median } from "./stats";
+import { diffHoldings, type HoldDiff } from "./holdingsDiff";
 
 // Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
@@ -208,6 +209,32 @@ export const overlapping = cached(async (code: string, n = 8): Promise<{ code: s
 )).rows, (code, n) => `${code}|${n}`);
 
 // Bir hisseyi tutan tüm fonlar: ağırlık, fon büyüklüğü ve tahmini pozisyon (ağırlık x büyüklük)
+// Fonun son iki KAP raporu arasında hisse değişimleri (holdings_hist). Tek rapor varsa null.
+export const getHoldingsChange = cached(async (code: string): Promise<{ cur: string; prev: string; diff: HoldDiff } | null> => {
+  const { rows } = await pool.query(
+    `WITH p AS (SELECT DISTINCT period, report FROM holdings_hist WHERE code=$1 ORDER BY period DESC LIMIT 2)
+     SELECT p.period::text, p.report, h.ticker, h.weight FROM p JOIN holdings_hist h ON h.code=$1 AND h.period=p.period`, [code]);
+  const periods = [...new Set(rows.map((r) => r.period))].sort().reverse();
+  if (periods.length < 2) return null;
+  const at = (p: string) => rows.filter((r) => r.period === p).map((r) => ({ ticker: r.ticker, weight: r.weight }));
+  return { cur: rows.find((r) => r.period === periods[0]).report, prev: rows.find((r) => r.period === periods[1]).report, diff: diffHoldings(at(periods[1]), at(periods[0])) };
+}, (code) => code);
+
+// Bir hissenin fonlardaki son iki rapor ağırlığı: { kod: { prev, cur } } (cur null = son raporda çıkarmış). Geçmişi tek rapor olan fon yok.
+export const tickerChanges = cached(async (ticker: string): Promise<Record<string, { prev: number | null; cur: number | null; name: string }>> => {
+  const { rows } = await pool.query(
+    `WITH p AS (SELECT code, period, row_number() OVER (PARTITION BY code ORDER BY period DESC) rn FROM (SELECT DISTINCT code, period FROM holdings_hist) t),
+     touched AS (SELECT DISTINCT code FROM holdings_hist WHERE ticker=$1)
+     SELECT p1.code, cur.weight AS cur, prev.weight AS prev, i.name FROM p p1
+     JOIN touched USING (code)
+     JOIN p p2 ON p2.code = p1.code AND p2.rn = 2
+     LEFT JOIN holdings_hist cur ON cur.code = p1.code AND cur.period = p1.period AND cur.ticker = $1
+     LEFT JOIN holdings_hist prev ON prev.code = p1.code AND prev.period = p2.period AND prev.ticker = $1
+     JOIN LATERAL (SELECT name FROM info WHERE code = p1.code ORDER BY date DESC LIMIT 1) i ON true
+     WHERE p1.rn = 1 AND (cur.weight IS NOT NULL OR prev.weight IS NOT NULL)`, [ticker]);
+  return Object.fromEntries(rows.map((r) => [r.code, { prev: r.prev, cur: r.cur, name: r.name }]));
+}, (t) => t);
+
 export const tickerFunds = cached(async (ticker: string): Promise<{ code: string; name: string; kind: string; weight: number; size: number | null; amount: number | null }[]> => (await pool.query(
   `SELECT h.code, i.name, i.kind, h.weight, i.size, h.weight / 100 * i.size AS amount FROM holdings h
    JOIN LATERAL (SELECT name, kind, size FROM info WHERE code = h.code ORDER BY date DESC LIMIT 1) i ON true

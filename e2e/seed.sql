@@ -25,3 +25,10 @@ INSERT INTO holdings_meta (code, disclosure_index, report, published) VALUES
 -- benchmark serileri (BIST100, USD, ALTIN), 401 gün
 INSERT INTO bench SELECT s, current_date - d, base * (1 + 0.001 * (400 - d) + 0.01 * sin(d))
 FROM (VALUES ('BIST100', 10000.0), ('USD', 30.0), ('ALTIN', 3000.0)) v(s, base), generate_series(0, 400) d;
+
+-- hisse portföyü geçmişi: iki rapor (BBB: ASELS çıktı, EREGL +2,5, THYAO +0,2 eşik altı; EEE: ASELS yeni, EREGL -1,9)
+INSERT INTO holdings_hist VALUES
+  ('BBB', current_date - 40, '7. Ay 2026', 'EREGL', 4.0), ('BBB', current_date - 40, '7. Ay 2026', 'THYAO', 8.0), ('BBB', current_date - 40, '7. Ay 2026', 'ASELS', 5.0),
+  ('BBB', current_date - 10, '8. Ay 2026', 'EREGL', 6.5), ('BBB', current_date - 10, '8. Ay 2026', 'THYAO', 8.2),
+  ('EEE', current_date - 40, '7. Ay 2026', 'EREGL', 5.0),
+  ('EEE', current_date - 10, '8. Ay 2026', 'EREGL', 3.1), ('EEE', current_date - 10, '8. Ay 2026', 'ASELS', 2.4);
