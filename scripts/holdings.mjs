@@ -161,6 +161,52 @@ export function periodEnd(rule) {
   return ymd(new Date(jan4.getTime() + ((n - 1) * 7 + 6 - ((jan4.getUTCDay() + 6) % 7)) * 864e5));
 }
 
+// Hisse portföyü geçmişi (holdings_hist): rapor dönemi başına ağırlıklar; aynı dönem yeniden ayrıştırılırsa üzerine yazılır.
+async function histWrite(c, code, rule, hs) {
+  const period = periodEnd(rule);
+  if (!period || !hs?.length) return;
+  await c.query("DELETE FROM holdings_hist WHERE code=$1 AND period=$2", [code, period]);
+  await c.query("INSERT INTO holdings_hist SELECT $1, $2::date, $3, * FROM unnest($4::text[], $5::float8[])", [code, period, rule, hs.map((h) => h.ticker), hs.map((h) => h.weight)]);
+}
+
+// Geçmiş tablosu sonradan eklendi: henüz geçmişi olmayan fonların mevcut son raporunu oraya kopyala (bir kez, ucuz)
+async function seedHist(db) {
+  const { rows } = await db.query(`SELECT h.code, m.report, h.ticker, h.weight FROM holdings h JOIN holdings_meta m ON m.code = h.code
+    WHERE m.report IS NOT NULL AND NOT EXISTS (SELECT 1 FROM holdings_hist x WHERE x.code = h.code)`);
+  const by = new Map();
+  for (const r of rows) (by.get(r.code) ?? by.set(r.code, { report: r.report, hs: [] }).get(r.code)).hs.push(r);
+  for (const [code, { report, hs }] of by) await histWrite(db, code, report, hs);
+  if (by.size) console.log(`geçmişe aktarıldı: ${by.size} fonun son raporu`);
+}
+
+// node scripts/holdings.mjs gecmis: her fonun bir önceki dönem raporunu (kap_pdr'de bilinen) indirip yalnız geçmişe yazar,
+// böylece "önceki rapora göre değişim" yeni rapor beklemeden görünür. KAP hız sınırı yüzünden yavaş; tekrar çalıştırılabilir.
+async function backfillPrev(db) {
+  const { rows } = await db.query(`SELECT m.code AS tefas, m.disclosure_index, m.report, p.code AS kap, a.hs
+    FROM holdings_meta m JOIN kap_pdr p ON p.disclosure_index = m.disclosure_index
+    JOIN LATERAL (SELECT (data->>'hs')::float8 AS hs FROM alloc WHERE code = m.code) a ON true
+    WHERE m.report IS NOT NULL AND (SELECT count(DISTINCT period) FROM holdings_hist h WHERE h.code = m.code) < 2`);
+  const todo = [];
+  for (const r of rows) {
+    const cur = periodEnd(r.report);
+    const { rows: prev } = await db.query("SELECT disclosure_index, rule, title FROM kap_pdr WHERE code=$1 AND disclosure_index < $2 ORDER BY disclosure_index DESC", [r.kap, r.disclosure_index]);
+    const p = prev.find((x) => periodEnd(x.rule) && periodEnd(x.rule) < cur);
+    if (p && !p.title.startsWith("İŞ PORTFÖY")) todo.push({ ...r, prev: p });
+  }
+  console.log(`önceki rapor indirilecek: ${todo.length} fon`);
+  let ok = 0;
+  await Promise.all(Array.from({ length: 2 }, async () => {
+    for (let x; (x = todo.pop()); ) {
+      try {
+        const { buf } = await fetchPdf(x.prev.disclosure_index);
+        const hs = buf ? await parsePdr(buf, x.hs) : null;
+        if (hs?.length) { await histWrite(db, x.tefas, x.prev.rule, hs); ok++; }
+      } catch (e) { console.log("  hata", x.tefas, e.message); }
+    }
+  }));
+  console.log(`bitti: ${ok} fonun önceki raporu geçmişe yazıldı`);
+}
+
 // Varlık dağılımını KAP raporunun dönem sonundaki son iş gününden al: hisse ağırlıklarıyla aynı güne ait olsun.
 // (tür, gün) başına tek TEFAS isteği; zaten doğru günü tutan fonlar atlanır.
 async function reportAlloc(db) {
@@ -191,6 +237,8 @@ const PARSER_V = 3; // ayrıştırıcı iyileşince artır: eski sürümle işle
 async function main() {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
   await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
+  await seedHist(db);
+  if (process.argv[2] === "gecmis") { await backfillPrev(db); await db.end(); return; }
   // aylık raporlayan fonlar için 75 gün geriye bak (günlük pencere başına 1 istek)
   const days = Number(process.argv[2] ?? 75);
   // sadece hisse tutan fonlar (TEFAS dağılımında hisse > 0)
@@ -219,6 +267,7 @@ async function main() {
           await c.query("DELETE FROM holdings WHERE code=$1", [x.tefas]);
           if (hs?.length)
             await c.query("INSERT INTO holdings SELECT $1, * FROM unnest($2::text[], $3::float8[])", [x.tefas, hs.map((h) => h.ticker), hs.map((h) => h.weight)]);
+          await histWrite(c, x.tefas, x.rule, hs);
           await c.query(
             "INSERT INTO holdings_meta (code, disclosure_index, report, published, note, v) VALUES ($1,$2,$3,$4::date,$5,$6) ON CONFLICT (code) DO UPDATE SET disclosure_index=$2, report=$3, published=$4::date, note=$5, v=$6, alloc=NULL, alloc_date=NULL",
             [x.tefas, x.disclosure_index, hs ? x.rule : null, x.published, hs ? null : note ?? "okunamadi", PARSER_V]);

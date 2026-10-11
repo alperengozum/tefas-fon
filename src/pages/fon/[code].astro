@@ -3,7 +3,7 @@ import Base from "../../layouts/Base.astro";
 import FundCharts from "../../components/FundCharts";
 import CompareChart from "../../components/CompareChart";
 import PinButton from "../../components/PinButton";
-import { getBench, getFund, getFunds, getHoldings, getNews, listFunds, overlapping, peers, riskFree } from "../../lib/db";
+import { getBench, getFund, getFunds, getHoldings, getHoldingsChange, getNews, listFunds, overlapping, peers, riskFree } from "../../lib/db";
 import { BENCH, forChart, inBase, ret, RETURNS } from "../../lib/analytics";
 import { annualVol, beta, calendar, corr, dailyReturns, drawdown, rank, ratios, rolling } from "../../lib/stats";
 import { label, pct, price, tl, tone, trDate } from "../../lib/format";
@@ -36,7 +36,7 @@ const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl",
 const p1 = (v: number | null) => (v == null ? "–" : `${v > 0 ? "+" : ""}${v.toFixed(1)}`);
 const at = (d: number) => { const c = new Date(new Date(last.date).getTime() - d * 864e5).toISOString().slice(0, 10); return [...f.history].reverse().find((r) => r.date <= c); };
 const flow = (d: number) => { const o = at(d); return o && last.price ? (last.shares - o.shares) * last.price : null; };
-const [rivals, { holdings, report, published, note, seen }, overl, news] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6), getNews(f.code)]);
+const [rivals, { holdings, report, published, note, seen }, overl, news, change] = await Promise.all([peers(f.code, f.kind), getHoldings(f.code), overlapping(f.code, 6), getNews(f.code), getHoldingsChange(f.code)]);
 // Hisse tutan ama listesi olmayan fonlarda nedenini göster
 const stockPct = f.alloc.hs ?? 0;
 const why = holdings.length || stockPct <= 0 ? null
@@ -173,6 +173,22 @@ const KIND_NAME: Record<string, [string, string]> = { YAT: ["Yatırım Fonları"
           </div>
         ))}
       </div>
+      {change && (
+        <div class="mt-4 rounded-lg border p-3 text-sm" data-testid="portfoy-degisim">
+          <div class="mb-2 font-medium">Önceki rapora göre <span class="text-xs font-normal text-muted-foreground">{change.prev} → {change.cur} · ağırlık değişimi fiyat hareketini de içerir, 0,5 puandan küçükler gösterilmez</span></div>
+          {[["Yeni giren", change.diff.added.map((h) => [h.ticker, `${h.weight.toFixed(2)}%`]), "text-emerald-600 dark:text-emerald-400"],
+            ["Çıkarılan", change.diff.removed.map((h) => [h.ticker, `${h.weight.toFixed(2)}%`]), "text-red-600 dark:text-red-400"],
+            ["Artırılan", change.diff.up.map((c) => [c.ticker, `+${c.delta.toFixed(2)}`]), "text-emerald-600 dark:text-emerald-400"],
+            ["Azaltılan", change.diff.down.map((c) => [c.ticker, c.delta.toFixed(2)]), "text-red-600 dark:text-red-400"]].map(([k, items, cls]) => (
+            (items as string[][]).length > 0 && (
+              <div class="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span class="w-24 shrink-0 text-xs text-muted-foreground">{k}</span>
+                {(items as string[][]).map(([t, v]) => <a class="hover:underline" href={`/hisse/${t}`}><b>{t}</b> <span class={`tabular-nums ${cls}`}>{v}</span></a>)}
+              </div>
+            )
+          ))}
+          {!change.diff.added.length && !change.diff.removed.length && !change.diff.up.length && !change.diff.down.length && <p class="text-xs text-muted-foreground">Belirgin değişiklik yok.</p>}
+        </div>
+      )}
     </section>
   )}
 

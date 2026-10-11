@@ -92,7 +92,8 @@ npm run dev          # http://localhost:4321
 | `npm run build` / `npm start` | Üretim derlemesi ve sunucu |
 | `npm run ingest [gün]` | TEFAS verisini çek |
 | `npm run ingest -- vol` | Volatiliteyi yeniden hesapla |
-| `npm run holdings` | KAP hisse portföylerini çek |
+| `npm run holdings` | KAP hisse portföylerini çek (her rapor `holdings_hist` geçmişine de yazılır) |
+| `npm run holdings -- gecmis` | Fonların bir önceki KAP raporunu indirip geçmişe yaz ("önceki rapora göre değişim" hemen dolsun; bir kez, yavaş) |
 | `npm test` | Birim testleri (PDF ayrıştırıcı, istatistik) |
 | `npm run test:e2e` | Playwright e2e testleri |
 
