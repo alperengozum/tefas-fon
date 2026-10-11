@@ -1,0 +1,39 @@
+---
+import Base from "../../layouts/Base.astro";
+import { listFunds } from "../../lib/db";
+import { aggregate } from "../../lib/founders";
+import { pct, tl, tone, trDate } from "../../lib/format";
+
+const KINDS: Record<string, [string, string]> = { yat: ["YAT", "Yatırım fonları"], bes: ["EMK", "Emeklilik (BES)"], byf: ["BYF", "BYF"], gyf: ["GYF", "GYF"] };
+const tur = KINDS[Astro.url.searchParams.get("tur") ?? ""] ? Astro.url.searchParams.get("tur")! : "yat";
+const { ref, funds } = await listFunds(KINDS[tur][0]);
+const rows = aggregate(funds);
+const total = rows.reduce((a, r) => a + r.size, 0);
+---
+<Base title={`Kurucular: ${KINDS[tur][1]} · TEFAS Fon Analiz`} description={`${KINDS[tur][1]} için portföy yönetim şirketleri: toplam büyüklük, fon sayısı, ağırlıklı 1 yıllık getiri ve net nakit akışı (${trDate(ref)}).`}>
+  <h1 class="mb-1 text-xl font-semibold">Kurucular</h1>
+  <p class="mb-4 text-sm text-muted-foreground">Fon kurucusu bazında aktif fonlar · veri tarihi {trDate(ref)}. Getiri: büyüklük ağırlıklı 1 yıllık (medyan ayrı); nakit akışı: son 1 ayda tahmini net giriş.</p>
+  <nav class="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Fon türü">
+    {Object.entries(KINDS).map(([k, [, l]]) => <a href={`/kurucu?tur=${k}`} class={`rounded-full border px-3 py-1 ${k === tur ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`} aria-current={k === tur ? "page" : undefined}>{l}</a>)}
+  </nav>
+  <div class="overflow-x-auto rounded-lg border">
+    <table class="w-full text-sm tabular-nums" data-testid="kurucu-tablo">
+      <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">#</th><th class="p-2 text-left">Kurucu</th><th class="p-2">Fon</th><th class="p-2">Büyüklük</th><th class="p-2">Pay</th><th class="p-2">Yatırımcı</th><th class="p-2">1Y (ağırlıklı)</th><th class="p-2">1Y (medyan)</th><th class="p-2">1A net giriş</th></tr></thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr class="border-t">
+            <td class="p-2 text-left text-muted-foreground">{i + 1}</td>
+            <td class="p-2 text-left"><a class="font-medium hover:underline" href={`/kurucu/${r.slug}?tur=${tur}`}>{r.founder}</a></td>
+            <td class="p-2 text-right">{r.count}</td>
+            <td class="p-2 text-right">{tl(r.size)}</td>
+            <td class="p-2 text-right">{total > 0 ? `${((r.size / total) * 100).toFixed(1)}%` : "–"}</td>
+            <td class="p-2 text-right">{r.investors.toLocaleString("tr-TR")}</td>
+            <td class={`p-2 text-right ${tone(r.y1)}`}>{pct(r.y1)}</td>
+            <td class={`p-2 text-right ${tone(r.y1Median)}`}>{pct(r.y1Median)}</td>
+            <td class={`p-2 text-right ${tone(r.flow_m1)}`}>{tl(r.flow_m1)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</Base>

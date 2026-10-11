@@ -11,10 +11,13 @@ const r2 = (v: number | null) => (v == null || !isFinite(v) ? null : Math.round(
 
 export type FundRow = Fund & { hay: string }; // hay: arama için önceden küçültülmüş "kod ad"
 
-const memo = new WeakMap<Fund[], string>(); // listFunds önbelleği aynı diziyi döndürür: her istekte yeniden kodlama yok
-export function encodeFunds(funds: Fund[]): string {
-  const hit = memo.get(funds);
-  if (hit) return hit;
+// Liste dışı ek bilgi: usd = USD/TRY'nin aynı vadelerdeki getirisi (%), istemci getirileri USD bazına çevirir
+export type ListMeta = { usd?: Record<string, number | null> };
+
+const memo = new WeakMap<Fund[], { key: string; out: string }>(); // listFunds önbelleği aynı diziyi döndürür: her istekte yeniden kodlama yok
+export function encodeFunds(funds: Fund[], meta: ListMeta = {}): string {
+  const key = JSON.stringify(meta), hit = memo.get(funds);
+  if (hit?.key === key) return hit.out;
   const dict = (k: "type" | "founder") => [...new Set(funds.map((f) => f[k]).filter((x): x is string => !!x))];
   const types = dict("type"), founders = dict("founder");
   const assets = [...new Set(funds.flatMap((f) => Object.keys(f.alloc ?? {})))];
@@ -28,14 +31,16 @@ export function encodeFunds(funds: Fund[]): string {
     f.alloc ? Object.entries(f.alloc).flatMap(([k, v]) => [ai.get(k), r2(v)]) : null,
     r2(f.vol), r2(f.mdd),
   ]);
-  const out = JSON.stringify({ types, founders, assets, rows });
-  memo.set(funds, out);
+  const out = JSON.stringify({ types, founders, assets, rows, ...meta });
+  memo.set(funds, { key, out });
   return out;
 }
 
-export function decodeFunds(json: string): FundRow[] {
-  const { types, founders, assets = [], rows } = JSON.parse(json) as { types: string[]; founders: string[]; assets?: string[]; rows: any[][] };
-  return rows.map((r) => {
+export const decodeFunds = (json: string): FundRow[] => decodeList(json).funds;
+
+export function decodeList(json: string): { funds: FundRow[] } & ListMeta {
+  const { types, founders, assets = [], rows, usd } = JSON.parse(json) as { types: string[]; founders: string[]; assets?: string[]; rows: any[][] } & ListMeta;
+  return { usd, funds: rows.map((r) => {
     const f: any = { code: r[0], kind: "", name: r[1], type: types[r[2]], founder: founders[r[3]],
       price: r[5], size: r[6], investors: r[7], stock: r[8], risk: r[9] };
     FLAGS.forEach((k, i) => (f[k] = !!(r[4] & (1 << i))));
@@ -49,5 +54,5 @@ export function decodeFunds(json: string): FundRow[] {
     for (let i = 0; a && i < a.length; i += 2) f.alloc[assets[a[i]]] = a[i + 1];
     f.hay = fold(`${f.code} ${f.name}`);
     return f as FundRow;
-  });
+  }) };
 }

@@ -1,0 +1,64 @@
+---
+import Base from "../../layouts/Base.astro";
+import { listFunds } from "../../lib/db";
+import { aggregate } from "../../lib/founders";
+import { pct, tl, tone, trDate } from "../../lib/format";
+
+// Kurucu birden çok türde fon yönetebilir (ör. YAT + BYF); ?tur= ile seçilen türün özeti, yoksa fonu olan ilk tür
+const KINDS: [string, string, string][] = [["yat", "YAT", "Yatırım fonları"], ["bes", "EMK", "Emeklilik (BES)"], ["byf", "BYF", "BYF"], ["gyf", "GYF", "GYF"]];
+const lists = await Promise.all(KINDS.map(([, k]) => listFunds(k)));
+const found = KINDS.map(([tur, , label], i) => ({ tur, label, ref: lists[i].ref, funds: lists[i].funds, stats: aggregate(lists[i].funds).find((r) => r.slug === Astro.params.slug) }))
+  .filter((x) => x.stats);
+if (!found.length) return new Response("Kurucu bulunamadı", { status: 404 });
+const cur = found.find((x) => x.tur === Astro.url.searchParams.get("tur")) ?? found[0];
+const s = cur.stats!;
+const funds = cur.funds.filter((f) => f.active && f.founder === s.founder).sort((a, b) => b.size - a.size);
+---
+<Base title={`${s.founder} fonları · TEFAS Fon Analiz`} path={`/kurucu/${s.slug}`}
+  description={`${s.founder}: ${s.count} aktif ${cur.label.toLocaleLowerCase("tr")}, toplam büyüklük ${tl(s.size)}, ağırlıklı 1 yıllık getiri ${pct(s.y1)} (${trDate(cur.ref)}).`}
+  crumbs={[{ name: "Kurucular", path: "/kurucu" }, { name: s.founder, path: `/kurucu/${s.slug}` }]}>
+  <nav class="mb-2 text-xs text-muted-foreground"><a class="hover:underline" href={`/kurucu?tur=${cur.tur}`}>Kurucular</a> ›</nav>
+  <h1 class="mb-1 text-xl font-semibold">{s.founder}</h1>
+  {found.length > 1 && (
+    <nav class="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Fon türü">
+      {found.map((x) => <a href={`/kurucu/${s.slug}?tur=${x.tur}`} class={`rounded-full border px-3 py-1 ${x.tur === cur.tur ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}>{x.label} ({x.stats!.count})</a>)}
+    </nav>
+  )}
+  <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5" data-testid="kurucu-ozet">
+    {[["Aktif fon", String(s.count), null], ["Toplam büyüklük", tl(s.size), null], ["Yatırımcı", s.investors.toLocaleString("tr-TR"), null], ["1Y getiri (ağırlıklı)", pct(s.y1), s.y1], ["1A net giriş", tl(s.flow_m1), s.flow_m1]].map(([k, v, n]) => (
+      <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class={`text-lg font-medium tabular-nums ${tone(n as number | null)}`}>{v}</div></div>
+    ))}
+  </div>
+
+  <section class="mb-8">
+    <h2 class="mb-3 font-semibold">Fon türüne göre</h2>
+    <div class="overflow-x-auto rounded-lg border">
+      <table class="w-full text-sm tabular-nums">
+        <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Tür</th><th class="p-2">Fon</th><th class="p-2">Büyüklük</th><th class="p-2">1Y (ağırlıklı)</th></tr></thead>
+        <tbody>{s.types.map((t) => <tr class="border-t"><td class="p-2 text-left">{t.type}</td><td class="p-2 text-right">{t.count}</td><td class="p-2 text-right">{tl(t.size)}</td><td class={`p-2 text-right ${tone(t.y1)}`}>{pct(t.y1)}</td></tr>)}</tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mb-8">
+    <h2 class="mb-3 font-semibold">Fonlar <span class="text-xs font-normal text-muted-foreground">büyüklüğe göre</span></h2>
+    <div class="overflow-x-auto rounded-lg border">
+      <table class="w-full text-sm tabular-nums" data-testid="kurucu-fonlar">
+        <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2 text-left">Tür</th><th class="p-2">Büyüklük</th><th class="p-2">1A</th><th class="p-2">1Y</th><th class="p-2">1A net giriş</th></tr></thead>
+        <tbody>
+          {funds.map((f) => (
+            <tr class="border-t">
+              <td class="p-2 text-left"><a class="hover:underline" href={`/fon/${f.code}`}><b>{f.code}</b> <span class="text-muted-foreground">{f.name}</span></a></td>
+              <td class="p-2 text-left">{f.type}</td>
+              <td class="p-2 text-right">{tl(f.size)}</td>
+              <td class={`p-2 text-right ${tone(f.m1)}`}>{pct(f.m1)}</td>
+              <td class={`p-2 text-right ${tone(f.y1)}`}>{pct(f.y1)}</td>
+              <td class={`p-2 text-right ${tone(f.flow_m1)}`}>{tl(f.flow_m1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <a class="mt-3 inline-block text-sm underline" href={`/karsilastir?codes=${funds.slice(0, 10).map((f) => f.code).join(",")}`}>En büyük {Math.min(funds.length, 10)} fonu karşılaştır</a>
+  </section>
+</Base>
