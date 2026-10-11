@@ -22,7 +22,7 @@ test("fon detayı: kanonik büyük harf ve sorgusuz, açıklama, fon OG görseli
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /^https?:\/\/.+\/og\/fon\/AAA\.png$/);
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
   const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
-  expect(ld["@graph"].map((g) => g["@type"])).toEqual(["WebSite", "WebPage", "BreadcrumbList"]);
+  expect(ld["@graph"].map((g: { "@type": string }) => g["@type"])).toEqual(["WebSite", "WebPage", "BreadcrumbList"]);
   expect(ld["@graph"][1]["@id"]).toMatch(/\/fon\/AAA#webpage$/);
   const img = await request.get("/og/fon/aaa.png");
   expect(img.status()).toBe(200);

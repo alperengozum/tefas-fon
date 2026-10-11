@@ -149,7 +149,7 @@ export const getHoldings = cached(async (code: string): Promise<{ holdings: Hold
     pool.query(`SELECT ticker, weight FROM holdings WHERE code=$1 ORDER BY weight DESC`, [code]),
     pool.query(`SELECT report, published::text, note FROM holdings_meta WHERE code=$1`, [code]),
   ]);
-  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: m.rowCount > 0 };
+  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: (m.rowCount ?? 0) > 0 };
 }, (code) => code);
 
 export type Notif = { disclosure_index: number; published: string; subject: string; url: string | null };
