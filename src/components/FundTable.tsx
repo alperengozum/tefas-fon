@@ -27,6 +27,7 @@ const VIEWS: Record<string, { name: string; cols: Col[] }> = {
   nakit: { name: "Nakit Giriş-Çıkışı", cols: [F("flow_w1", "1 Hafta"), F("flow_m1", "1 Ay"), F("flow_m3", "3 Ay"), { key: "size", head: "Büyüklük", fmt: tl }] },
 };
 const MAX_COMPARE = 10;
+const USD_KEYS = new Set(PERIOD_DAYS.map(([k]) => k)); // USD seçiminde çevrilen getiri alanları
 
 // Hızlı filtreler (aç/kapa)
 const FLAGS: { key: keyof Fund; name: string }[] = [
@@ -68,6 +69,7 @@ function FundTableView({ data }: { data: string }) {
   const list = useMemo(() => decodeList(data), [data]);
   // TL / USD: USD seçiliyken getiri alanları USD/TRY'nin aynı vadeli getirisine göre çevrilir (sıralama ve filtre de çevrilmiş değerle)
   const [ccy, setCcy] = useState<"TL" | "USD">("TL");
+  const usdOn = ccy === "USD" && !!list.usd;
   const funds = useMemo(() => {
     const usd = list.usd;
     if (ccy === "TL" || !usd) return list.funds;
@@ -159,11 +161,12 @@ function FundTableView({ data }: { data: string }) {
     const extra = [
       ...(stockCol.length ? [[`${f.stock.toUpperCase()} ağırlık %`, (x: Fund) => byStock?.[x.code]] as const] : []),
       ...assetCols.map((r) => [`${assetName(r.a)} %`, (x: Fund) => (x.alloc ? share(x.alloc, r.a) : null)] as const),
-      ...cols.map((c) => [c.fmt === pct ? `${c.head} %` : c.head, (x: Fund) => x[c.key] as number | null] as const),
+      // USD seçiliyken getiri sütunları çevrilmiş değer: başlıkta belirt
+      ...cols.map((c) => [c.fmt === pct ? `${c.head} %${usdOn && USD_KEYS.has(c.key as string) ? " (USD)" : ""}` : c.head, (x: Fund) => x[c.key] as number | null] as const),
     ];
     const headers = ["Kod", "Fon", "Tür", "Kurucu", "Durum", "Fiyat", "Büyüklük (₺)", "Yatırımcı", ...extra.map(([h]) => h)];
     const data = rows.map((x) => [x.code, x.name, x.type, x.founder, x.active ? "aktif" : "pasif", x.price || null, x.size, x.investors, ...extra.map(([, get]) => get(x))]);
-    download(`fonlar-${location.pathname.split("/").pop()}-${VIEWS[view].name.toLocaleLowerCase("tr")}-${today()}.csv`, toCsv(headers, data));
+    download(`fonlar-${location.pathname.split("/").pop()}-${VIEWS[view].name.toLocaleLowerCase("tr")}${usdOn ? "-usd" : ""}-${today()}.csv`, toCsv(headers, data));
   };
   const addRule = () => {
     if (!draft.a) return;

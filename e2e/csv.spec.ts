@@ -21,6 +21,17 @@ test("liste: CSV indir filtrelenmiş tüm satırları açık görünümün sütu
   expect(lines[1]).toMatch(/^[A-Z0-9]{3};[^;]+;[^;]+;[^;]+;aktif;\d+(,\d+)?;\d+;\d+;/); // ondalık virgül, işaretsiz sayılar
 });
 
+test("liste: USD bazında seçiliyken CSV getiri başlıkları (USD) ve dosya adı -usd", async ({ page }) => {
+  await page.goto("/fonlar/yat");
+  await page.waitForFunction(() => { const i = document.querySelector("tbody input"); return !!i && Object.keys(i).some((k) => k.startsWith("__react")); });
+  await page.getByRole("button", { name: "USD bazında" }).click();
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /^CSV indir/ }).click()]);
+  expect(dl.suggestedFilename()).toMatch(/^fonlar-yat-getiri-usd-\d{4}-\d{2}-\d{2}\.csv$/);
+  const head = (await read(dl)).replace(/^﻿/, "").split("\r\n")[0];
+  expect(head).toContain(";1Y % (USD);");
+  expect(head).toMatch(/;Risk$/); // getiri olmayan sütun işaretlenmez
+});
+
 test("portföy: fon tablosu CSV", async ({ page }) => {
   await page.goto("/portfoy?f=AAA:tl:7000&f=BBB:tl:3000");
   const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV indir" }).click()]);
