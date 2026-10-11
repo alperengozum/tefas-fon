@@ -5,7 +5,7 @@ import { COLS, runScan, SCANS } from "../../lib/scans";
 import { pct, tl, tone, trDate } from "../../lib/format";
 
 const s = SCANS.find((x) => x.slug === Astro.params.slug);
-if (!s) return new Response("Tarama bulunamadı", { status: 404 });
+if (!s) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
 const { ref, funds } = await listFunds(s.kind);
 const rows = runScan(s, funds);
 const fmt = (k: keyof typeof COLS, v: number | null) => (k === "size" || k === "flow_m1" ? tl(v) : pct(v));
