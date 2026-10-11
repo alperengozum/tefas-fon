@@ -8,7 +8,7 @@ test("BES simülasyonu: DK fonu otomatik seçilir, yıllık DK oranları ve hak 
   const ozet = page.getByTestId("bes-ozet");
   await expect(ozet).toContainText("EMD (otomatik)"); // aynı şirketin DEVLET KATKISI fonu
   await expect(ozet.locator("div.rounded-lg", { hasText: "Hak ediş" })).toContainText("%0"); // 3 yıldan kısa
-  await expect(ozet.locator("div.rounded-lg", { hasText: "Yatırılan katkı" })).toContainText(/1[23] B ₺/);
+  await expect(ozet.locator("div.rounded-lg", { hasText: "Yatırılan katkı" })).toContainText(/1[23]\.000 ₺/); // tam tutar
   const rows = page.getByTestId("bes-yillar").locator("tbody tr");
   const years = await rows.locator("td:first-child").allInnerTexts();
   for (const [i, y] of years.entries()) await expect(rows.nth(i).locator("td").nth(3)).toHaveText(Number(y) >= 2026 ? "%20" : "%30");

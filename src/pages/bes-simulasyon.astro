@@ -5,7 +5,9 @@ import { getFunds, listFunds } from "../lib/db";
 import { DK_RULES, simulateBes } from "../lib/bes";
 import { xirr } from "../lib/stats";
 import { classify } from "../lib/classify";
-import { pct, tl, tone, trDate } from "../lib/format";
+import { pct, tone, trDate } from "../lib/format";
+// planlama sayfası: tam tutar (tl() "1,5 B" gibi yuvarlar)
+const money = (v: number | null | undefined) => (v == null || !isFinite(v) ? "–" : `${Math.round(v).toLocaleString("tr-TR")} ₺`);
 
 // ?fon=KOD&dk=KOD&aylik=2000&baslangic=YYYY-MM-DD&bitis=YYYY-MM-DD&yas=35
 const q = Astro.url.searchParams;
@@ -52,14 +54,14 @@ const rate = DK_RULES.at(-1)!;
     <>
       <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="bes-ozet">
         {[
-          ["Yatırılan katkı", tl(r.invested), null, `${r.n} ay · ${trDate(r.first)} → ${trDate(r.last)}`],
-          ["Katkı değeri", tl(r.value), r.value - r.invested, `${fund.code}`],
-          ["Devlet katkısı", tl(r.dkValue), r.dkValue - r.dkPaid, `yatırılan ${tl(r.dkPaid)} · ${dkFund!.code}${dkAuto ? " (otomatik)" : ""}`],
+          ["Yatırılan katkı", money(r.invested), null, `${r.n} ay · ${trDate(r.first)} → ${trDate(r.last)}`],
+          ["Katkı değeri", money(r.value), r.value - r.invested, `${fund.code}`],
+          ["Devlet katkısı", money(r.dkValue), r.dkValue - r.dkPaid, `yatırılan ${money(r.dkPaid)} · ${dkFund!.code}${dkAuto ? " (otomatik)" : ""}`],
           ["Hak ediş", `%${Math.round(r.vest * 100)}`, null, `${r.years.toFixed(1)} yıl${age != null ? ` · bitişte ${Math.floor(age + r.years)} yaş` : ""}`],
-          ["Çekilebilir toplam", tl(r.total), r.total - r.invested, "katkı değeri + hak edilen DK"],
+          ["Çekilebilir toplam", money(r.total), r.total - r.invested, "katkı değeri + hak edilen DK"],
           ["Getiri", pct(r.ret), r.ret, "çekilebilir / yatırılan"],
           ["Yıllık (XIRR)", r.xirr == null ? "–" : pct(r.xirr * 100), r.xirr, "katkı tarihlerine göre"],
-          ["DK tamamı hak edilseydi", tl(r.value + r.dkValue), null, "10 yıl + 56 yaş"],
+          ["DK tamamı hak edilseydi", money(r.value + r.dkValue), null, "10 yıl + 56 yaş"],
         ].map(([k, v, n, sub]) => (
           <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class={`text-lg font-medium tabular-nums ${n == null ? "" : tone(n as number)}`}>{v}</div><div class="mt-1 text-xs text-muted-foreground">{sub}</div></div>
         ))}
@@ -70,7 +72,7 @@ const rate = DK_RULES.at(-1)!;
           <table class="w-full text-sm tabular-nums" data-testid="bes-yillar">
             <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Yıl</th><th class="p-2">Katkı</th><th class="p-2">Devlet katkısı</th><th class="p-2">DK oranı</th><th class="p-2">Yıllık DK tavanı</th></tr></thead>
             <tbody>{r.byYear.map((y) => (
-              <tr class="border-t"><td class="p-2 text-left">{y.year}</td><td class="p-2 text-right">{tl(y.paid)}</td><td class="p-2 text-right">{tl(y.dk)}</td><td class="p-2 text-right">%{Math.round((y.paid ? y.dk / y.paid : 0) * 100)}</td><td class="p-2 text-right">{y.cap == null ? "bilinmiyor" : tl(y.cap)}</td></tr>
+              <tr class="border-t"><td class="p-2 text-left">{y.year}</td><td class="p-2 text-right">{money(y.paid)}</td><td class="p-2 text-right">{money(y.dk)}</td><td class="p-2 text-right">%{Math.round((y.paid ? y.dk / y.paid : 0) * 100)}</td><td class="p-2 text-right">{y.cap == null ? "bilinmiyor" : money(y.cap)}</td></tr>
             ))}</tbody>
           </table>
         </div>
