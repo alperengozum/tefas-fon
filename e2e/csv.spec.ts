@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Download } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-const read = async (dl) => readFileSync(await dl.path(), "utf8");
+const read = async (dl: Download) => readFileSync(await dl.path(), "utf8");
 
 test("liste: CSV indir filtrelenmiş tüm satırları açık görünümün sütunlarıyla verir", async ({ page }) => {
   await page.goto("/fonlar/yat");

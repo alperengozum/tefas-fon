@@ -1,14 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 // iPhone SE genişliği: en dar yaygın ekran
 test.use({ viewport: { width: 375, height: 667 }, hasTouch: true });
 
-const noPageScroll = async (page) => {
+const noPageScroll = async (page: Page) => {
   const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(over, "sayfa yatayda taşıyor").toBeLessThanOrEqual(0);
 };
-const codeAt = async (page, i = 0) => (await page.locator("tbody tr").nth(i).locator("td").nth(1).innerText()).trim();
-const list = async (page, path = "/fonlar/yat") => {
+const codeAt = async (page: Page, i = 0) => (await page.locator("tbody tr").nth(i).locator("td").nth(1).innerText()).trim();
+const list = async (page: Page, path = "/fonlar/yat") => {
   await page.goto(path);
   await expect(page.locator("tbody tr").first()).toBeVisible();
   await page.waitForFunction(() => { const i = document.querySelector("tbody input"); return !!i && Object.keys(i).some((k) => k.startsWith("__react")); });

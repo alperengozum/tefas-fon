@@ -28,7 +28,7 @@ export default function FundCharts({ history }: { history: H }) {
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-muted-foreground/30" />
             <XAxis dataKey="date" tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" minTickGap={40} tickFormatter={trDate} />
             <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11, fill: "currentColor" }} className="text-muted-foreground" tickFormatter={(v) => fmt(v)} width={70} />
-            <Tooltip labelFormatter={trDate} formatter={(v: number) => fmt(v)} />
+            <Tooltip labelFormatter={(l) => trDate(typeof l === "string" ? l : null)} formatter={(v) => fmt(Number(v))} />
             <Area type="monotone" dataKey={metric} name={METRICS[metric][0]} stroke="#2563eb" fill="#2563eb" fillOpacity={0.15} dot={false} connectNulls isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>

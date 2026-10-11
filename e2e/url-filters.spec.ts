@@ -1,7 +1,7 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-const rows = (page) => page.locator("tbody tr");
-const ready = async (page, path) => {
+const rows = (page: Page) => page.locator("tbody tr");
+const ready = async (page: Page, path: string) => {
   await page.goto(path);
   await expect(rows(page).first()).toBeVisible();
   await page.waitForFunction(() => { const i = document.querySelector("tbody input"); return !!i && Object.keys(i).some((k) => k.startsWith("__react")); });
