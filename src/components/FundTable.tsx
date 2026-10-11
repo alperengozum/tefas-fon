@@ -132,7 +132,7 @@ function FundTableView({ data }: { data: string }) {
       .sort((a, b) => {
         const x = val(a, sort.key), y = val(b, sort.key);
         // pinlenen fonlar her sıralamada en üstte
-        return +pins.has(b.code) - +pins.has(a.code) || (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
+        return +pins.has(b.code) - +pins.has(a.code) || Number(x == null) - Number(y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
       });
   }, [funds, df, sort, byStock, pins]);
 

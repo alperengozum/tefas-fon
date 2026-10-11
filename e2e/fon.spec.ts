@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-const rows = (page) => page.locator("tbody tr");
+const rows = (page: Page) => page.locator("tbody tr");
 // tablo 100 satırla sınırlı; gerçek eşleşme sayısı altbilgideki "N fon" yazısında
-const total = async (page) => Number((await page.getByText(/^\d+ fon/).innerText()).match(/^\d+/)![0]);
-const codeAt = async (page, i = 0) => (await rows(page).nth(i).locator("td").nth(1).innerText()).trim();
+const total = async (page: Page) => Number((await page.getByText(/^\d+ fon/).innerText()).match(/^\d+/)![0]);
+const codeAt = async (page: Page, i = 0) => (await rows(page).nth(i).locator("td").nth(1).innerText()).trim();
 // React hydrate olmadan filtre/tıklama çalışmaz; satırdaki checkbox'ta react props varsa hazır
-const ready = async (page, path = "/fonlar/yat") => {
+const ready = async (page: Page, path = "/fonlar/yat") => {
   await page.goto(path);
   await expect(rows(page).first()).toBeVisible();
   // ?hisse= ile hydrate sonrası liste kısa süre boşalabilir, o yüzden null korumalı
@@ -228,7 +228,7 @@ test("sonsuz kaydırma: alta inince satırlar 100'den artar", async ({ page }) =
 
 // --- endeks, korelasyon/örtüşme, hisse sayfası, portföy, simülasyon ---
 // DB'de birden çok fonun tuttuğu bir hisse (EREGL) kullanılır; yoksa atlanır
-const holders = async (request) => Object.keys(await (await request.get("/api/holdings?ticker=EREGL")).json());
+const holders = async (request: APIRequestContext) => Object.keys(await (await request.get("/api/holdings?ticker=EREGL")).json());
 
 test("fon detay: endekslere karşı tablo ve grafik", async ({ page }) => {
   await ready(page);
@@ -290,7 +290,7 @@ test("simülasyon: fon ve endeksler için SIP/tek seferlik sonuç", async ({ pag
 });
 
 // fon seçici: koda küçük harfle yaz, listeden ilk eşleşmeyi seç (combobox adı `name`)
-const pick = async (page, name, code, nth = 0) => {
+const pick = async (page: Page, name: string, code: string, nth = 0) => {
   await page.getByRole("combobox", { name }).nth(nth).fill(code.toLowerCase());
   await page.getByRole("option").first().click();
 };
