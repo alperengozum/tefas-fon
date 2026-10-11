@@ -2,6 +2,7 @@ import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
 import { median } from "./stats";
 import { diffHoldings, type HoldDiff } from "./holdingsDiff";
+import { cached as lru } from "./cache";
 
 // Prod'da (Docker NODE_ENV=production) varsayılan tefas:tefas parolasına düşmesin.
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
@@ -84,20 +85,7 @@ export function listFunds(kind: string): Promise<Listed> {
   return p;
 }
 
-// Genel amaçlı TTL önbelleği (anahtar başına Promise; hata önbelleklenmez, en fazla 500 kayıt, en eski önce atılır).
-// ponytail: süreç içi Map, tek konteyner; birden çok örnek olursa Redis. Veri günde bir değiştiği için 10 dk bayatlık kabul.
-function cached<A extends unknown[], T>(fn: (...a: A) => Promise<T>, key: (...a: A) => string) {
-  const m = new Map<string, { t: number; p: Promise<T> }>();
-  return (...a: A): Promise<T> => {
-    const k = key(...a), hit = m.get(k);
-    if (hit && Date.now() - hit.t < TTL) return hit.p;
-    const p = fn(...a);
-    m.set(k, { t: Date.now(), p });
-    p.catch(() => m.delete(k));
-    if (m.size > 500) m.delete(m.keys().next().value!);
-    return p;
-  };
-}
+const cached = <A extends unknown[], T>(fn: (...a: A) => Promise<T>, key: (...a: A) => string) => lru(fn, key, TTL);
 
 export type Detail = {
   code: string; name: string; kind: string;
