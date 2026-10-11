@@ -1,0 +1,74 @@
+---
+import Base from "../layouts/Base.astro";
+import FundPicker from "../components/FundCombobox";
+import { getFund } from "../lib/db";
+import { dailyReturns } from "../lib/stats";
+import { goalStats, seedOf, simulatePaths } from "../lib/goal";
+import { pct, tl } from "../lib/format";
+
+// ?fon=KOD&baslangic=0&aylik=5000&yil=10&hedef=1000000&enflasyon=30
+const q = Astro.url.searchParams;
+const code = (q.get("fon") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const num = (k: string, d: number | null, lo: number, hi: number) => { const v = Number(q.get(k)); return q.get(k) && isFinite(v) ? Math.min(Math.max(v, lo), hi) : d; };
+const initial = num("baslangic", 0, 0, 1e12)!, monthly = num("aylik", 5000, 0, 1e9)!, years = Math.round(num("yil", 10, 1, 40)!);
+const goal = num("hedef", null, 1, 1e13), inflPct = num("enflasyon", null, 0, 200);
+const N = 2000;
+
+const f = code ? await getFund(code) : null;
+const last = f?.history.at(-1);
+const since = last ? new Date(new Date(last.date).getTime() - 365 * 864e5).toISOString().slice(0, 10) : "";
+const daily = f ? [...dailyReturns(f.history, since).values()] : [];
+const enough = daily.length >= 60;
+const paths = f && enough ? simulatePaths(daily, years, N, seedOf(`${code}|${since}|${years}|${inflPct ?? 0}`), (inflPct ?? 0) / 100) : null;
+const s = paths ? goalStats(paths, initial, monthly, goal) : null;
+// varsayım: geçmiş 1 yılın günlük getirilerinin yıllıklandırılmış bileşiği
+const annual = daily.length ? (daily.reduce((g, r) => g * (1 + r), 1) ** (252 / daily.length) - 1) * 100 : null;
+const shown = s ? s.yearly.filter((y) => years <= 10 || y.year % 5 === 0 || y.year === years) : [];
+const end = s?.yearly.at(-1);
+const unit = inflPct ? "bugünün parasıyla" : "nominal TL";
+---
+<Base title="Hedef planlayıcı · TEFAS Fon Analiz" description="Ayda şu kadar biriktirirsem N yılda hedefime ulaşır mıyım? Fonun geçmiş getirilerinden Monte Carlo senaryolarıyla olasılık ve gereken aylık tutar." noindex={Astro.url.search !== ""}>
+  <h1 class="mb-1 text-xl font-semibold">Hedef planlayıcı</h1>
+  <p class="mb-4 text-sm text-muted-foreground">"Ayda X ₺ ile N yılda hedefime ulaşır mıyım?" Seçtiğin fonun son 1 yıllık günlük getirileri aylık bloklar halinde rastgele yeniden dizilerek {N.toLocaleString("tr-TR")} senaryo üretilir; sonuç bir aralık ve olasılıktır, tahmin değil.</p>
+  <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
+    <div class="flex flex-col gap-1">Fon<FundPicker client:only="react" name="fon" initial={code ? [code] : []} max={1} /></div>
+    <label class="flex flex-col gap-1">Başlangıç birikimi (₺)<input name="baslangic" type="number" min="0" value={initial} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Aylık birikim (₺)<input name="aylik" type="number" min="0" value={monthly} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Süre (yıl)<input name="yil" type="number" min="1" max="40" value={years} class="h-8 w-20 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Hedef (₺)<input name="hedef" type="number" min="1" value={goal ?? ""} placeholder="ops." class="h-8 w-36 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Yıllık enflasyon %<input name="enflasyon" type="number" min="0" max="200" step="any" value={inflPct ?? ""} placeholder="ops." class="h-8 w-24 rounded-lg border bg-transparent px-2" /></label>
+    <button class="h-8 rounded-lg bg-primary px-3 text-primary-foreground">Hesapla</button>
+  </form>
+
+  {!code ? <p class="text-sm text-muted-foreground">Bir fon seç, birikim tutarlarını ve süreyi gir.</p>
+    : !f ? <p class="text-sm text-red-600">Fon bulunamadı: {code}</p>
+    : !enough ? <p class="text-sm text-muted-foreground">{code} için son 1 yılda yeterli günlük veri yok (en az 60 gün gerekir).</p> : s && end && (
+    <>
+      <p class="mb-3 text-sm" data-testid="hedef-varsayim">Varsayım: <b>{code}</b> son 1 yılda yıllık <b>{pct(annual)}</b> (nominal) getiri ve o yılın oynaklığı · değerler <b>{unit}</b>{inflPct ? ` (yıllık %${inflPct} enflasyon; aylık birikim enflasyonla artar)` : ""}.</p>
+      <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="hedef-ozet">
+        {[
+          ...(goal != null ? [["Hedefe ulaşma olasılığı", `%${Math.round(s.prob! * 100)}`, `${tl(goal)} · ${years} yıl`]] : []),
+          ["Medyan son değer", tl(end.p50), "senaryoların yarısı bunun üstünde"],
+          ["Kötü senaryo (%10)", tl(end.p10), "10 senaryodan 1'i bunun altında"],
+          ["İyi senaryo (%90)", tl(end.p90), "10 senaryodan 1'i bunun üstünde"],
+          ["Toplam birikim", tl(initial + monthly * years * 12), inflPct ? "ilk ayın tutarıyla (sonra enflasyonla artar)" : "yatırılan"],
+          ...(goal != null ? [["Hedef için aylık (%50)", tl(s.need50), "medyan senaryoda tutturur"], ["Hedef için aylık (%80)", tl(s.need80), "10 senaryodan 8'inde tutturur"]] : []),
+        ].map(([k, v, sub]) => (
+          <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class="text-lg font-medium tabular-nums">{v}</div><div class="mt-1 text-xs text-muted-foreground">{sub}</div></div>
+        ))}
+      </div>
+      <section class="mb-6">
+        <h2 class="mb-3 font-semibold">Yıllara göre aralık <span class="text-xs font-normal text-muted-foreground">{unit}</span></h2>
+        <div class="overflow-x-auto rounded-lg border">
+          <table class="w-full text-sm tabular-nums" data-testid="hedef-yillar">
+            <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Yıl</th><th class="p-2">Yatırılan</th><th class="p-2">Kötü (%10)</th><th class="p-2">Medyan</th><th class="p-2">İyi (%90)</th></tr></thead>
+            <tbody>{shown.map((y) => (
+              <tr class={`border-t ${goal != null && y.year === years ? "font-medium" : ""}`}><td class="p-2 text-left">{y.year}</td><td class="p-2 text-right">{tl(initial + monthly * y.year * 12)}</td><td class="p-2 text-right">{tl(y.p10)}</td><td class="p-2 text-right">{tl(y.p50)}</td><td class="p-2 text-right">{tl(y.p90)}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  )}
+  <p class="mt-4 text-xs text-muted-foreground">Yöntem: son 1 yılın günlük getirilerinden 21 işlem günlük bloklar (≈1 ay) rastgele seçilir, her ay başı birikim eklenir; ardışık iyi/kötü günler birlikte kalır. Tek bir yılın getirisi ileriye taşındığı için o yıl olağanüstüyse sonuç da öyle çıkar; yüksek enflasyonda nominal TL çok büyük görünür, enflasyon girerek bugünün parasıyla bak. Vergi (stopaj) ve fon değişikliği hesaba katılmaz; yatırım tavsiyesi değildir.</p>
+</Base>
