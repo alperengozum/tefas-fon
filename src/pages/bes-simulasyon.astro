@@ -1,0 +1,83 @@
+---
+import Base from "../layouts/Base.astro";
+import FundPicker from "../components/FundCombobox";
+import { getFunds, listFunds } from "../lib/db";
+import { DK_RULES, simulateBes } from "../lib/bes";
+import { xirr } from "../lib/stats";
+import { classify } from "../lib/classify";
+import { pct, tl, tone, trDate } from "../lib/format";
+
+// ?fon=KOD&dk=KOD&aylik=2000&baslangic=YYYY-MM-DD&bitis=YYYY-MM-DD&yas=35
+const q = Astro.url.searchParams;
+const code = (q.get("fon") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const monthly = Math.min(Math.max(Number(q.get("aylik")) || 2000, 1), 1e9);
+const isDate = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s)) ? s : null);
+const today = new Date().toISOString().slice(0, 10);
+const start = isDate(q.get("baslangic")) ?? new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+const end = isDate(q.get("bitis")) ?? today;
+const age = q.get("yas") && isFinite(Number(q.get("yas"))) ? Math.min(Math.max(Number(q.get("yas")), 18), 100) : null;
+
+// DK fonu: seçilmemişse aynı emeklilik şirketinin en büyük aktif "DEVLET KATKISI" fonu, yoksa seçilen fonun kendisi
+let dkCode = (q.get("dk") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+let dkAuto = false;
+const { funds: emk } = code ? await listFunds("EMK") : { funds: [] };
+const me = emk.find((f) => f.code === code);
+if (code && !dkCode) {
+  const founder = me?.founder ?? (me ? classify(me.name, "EMK").founder : "");
+  const dkFunds = emk.filter((f) => f.active && /DEVLET KATKISI/i.test(f.name));
+  dkCode = (dkFunds.find((f) => f.founder === founder) ?? dkFunds[0])?.code ?? code;
+  dkAuto = true;
+}
+const { funds } = code ? await getFunds([...new Set([code, dkCode])]) : { funds: [] };
+const fund = funds.find((f) => f.code === code), dkFund = funds.find((f) => f.code === dkCode) ?? fund;
+const r = fund ? simulateBes(fund.history, dkFund!.history, monthly, start, end, age, xirr) : null;
+const rate = DK_RULES.at(-1)!;
+---
+<Base title="BES simülasyonu · TEFAS Fon Analiz" description="Bireysel emeklilikte aylık katkı, devlet katkısı (%20 / %30, yıllık tavan) ve hak ediş ile geçmişte şu BES fonunu seçseydim ne olurdu?" noindex={Astro.url.search !== ""}>
+  <h1 class="mb-1 text-xl font-semibold">BES simülasyonu</h1>
+  <p class="mb-4 text-sm text-muted-foreground">Seçtiğin emeklilik fonuna her ay düzenli katkı; devlet katkısı (DK) yıllık tavana kadar şirketin devlet katkısı fonuna yatırılır, çekebileceğin kısmı sistemdeki süreye ve yaşa bağlıdır. Geçmiş getiri geleceği garanti etmez.</p>
+  <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
+    <div class="flex flex-col gap-1">BES fonu<FundPicker client:only="react" name="fon" initial={code ? [code] : []} max={1} /></div>
+    <div class="flex flex-col gap-1">Devlet katkısı fonu <span class="text-xs text-muted-foreground">boşsa şirketin en büyük DK fonu</span><FundPicker client:only="react" name="dk" initial={q.get("dk") ? [dkCode] : []} max={1} /></div>
+    <label class="flex flex-col gap-1">Aylık katkı (₺)<input name="aylik" type="number" min="1" value={monthly} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Başlangıç<input name="baslangic" type="date" value={start} class="h-8 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Bitiş<input name="bitis" type="date" value={end} class="h-8 rounded-lg border bg-transparent px-2" /></label>
+    <label class="flex flex-col gap-1">Başlangıçta yaş<input name="yas" type="number" min="18" max="100" value={age ?? ""} placeholder="ops." class="h-8 w-20 rounded-lg border bg-transparent px-2" /></label>
+    <button class="h-8 rounded-lg bg-primary px-3 text-primary-foreground">Hesapla</button>
+  </form>
+
+  {!code ? <p class="text-sm text-muted-foreground">Bir BES fonu seç, aylık katkıyı ve tarih aralığını gir.</p>
+    : !fund ? <p class="text-sm text-red-600">Fon bulunamadı: {code}</p>
+    : !r ? <p class="text-sm text-muted-foreground">Bu aralıkta yeterli veri yok.</p> : (
+    <>
+      <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="bes-ozet">
+        {[
+          ["Yatırılan katkı", tl(r.invested), null, `${r.n} ay · ${trDate(r.first)} → ${trDate(r.last)}`],
+          ["Katkı değeri", tl(r.value), r.value - r.invested, `${fund.code}`],
+          ["Devlet katkısı", tl(r.dkValue), r.dkValue - r.dkPaid, `yatırılan ${tl(r.dkPaid)} · ${dkFund!.code}${dkAuto ? " (otomatik)" : ""}`],
+          ["Hak ediş", `%${Math.round(r.vest * 100)}`, null, `${r.years.toFixed(1)} yıl${age != null ? ` · bitişte ${Math.floor(age + r.years)} yaş` : ""}`],
+          ["Çekilebilir toplam", tl(r.total), r.total - r.invested, "katkı değeri + hak edilen DK"],
+          ["Getiri", pct(r.ret), r.ret, "çekilebilir / yatırılan"],
+          ["Yıllık (XIRR)", r.xirr == null ? "–" : pct(r.xirr * 100), r.xirr, "katkı tarihlerine göre"],
+          ["DK tamamı hak edilseydi", tl(r.value + r.dkValue), null, "10 yıl + 56 yaş"],
+        ].map(([k, v, n, sub]) => (
+          <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">{k}</div><div class={`text-lg font-medium tabular-nums ${n == null ? "" : tone(n as number)}`}>{v}</div><div class="mt-1 text-xs text-muted-foreground">{sub}</div></div>
+        ))}
+      </div>
+      <section class="mb-6">
+        <h2 class="mb-3 font-semibold">Yıllara göre</h2>
+        <div class="overflow-x-auto rounded-lg border">
+          <table class="w-full text-sm tabular-nums" data-testid="bes-yillar">
+            <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Yıl</th><th class="p-2">Katkı</th><th class="p-2">Devlet katkısı</th><th class="p-2">DK oranı</th><th class="p-2">Yıllık DK tavanı</th></tr></thead>
+            <tbody>{r.byYear.map((y) => (
+              <tr class="border-t"><td class="p-2 text-left">{y.year}</td><td class="p-2 text-right">{tl(y.paid)}</td><td class="p-2 text-right">{tl(y.dk)}</td><td class="p-2 text-right">%{Math.round((y.paid ? y.dk / y.paid : 0) * 100)}</td><td class="p-2 text-right">{y.cap == null ? "bilinmiyor" : tl(y.cap)}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </section>
+      {r.dkCash && <p class="mb-2 text-xs text-amber-600">DK fonunda bazı günler fiyat yok; o katkılar getirisiz (nakit) sayıldı.</p>}
+      {r.capUnknown.length > 0 && <p class="mb-2 text-xs text-amber-600">{r.capUnknown.join(", ")} için asgari ücret tablosunda veri yok; DK tavanı uygulanmadı.</p>}
+    </>
+  )}
+  <p class="mt-4 text-xs text-muted-foreground" data-testid="bes-not">Devlet katkısı: ödenen katkının %30'u, 1 Ocak 2026 ve sonrası ödemelerde %{rate.rate * 100} (7 Ocak 2026 Cumhurbaşkanı Kararı); yıllık üst sınır o yılın brüt asgari ücret toplamının aynı oranı. Hak ediş: 3 yıl %15, 6 yıl %35, 10 yıl %60, 10 yıl + 56 yaş %100. Fon işletim gideri fiyata yansır; giriş aidatı, sistemden çıkışta getiriye uygulanan vergi ve DK'nın hesaba geçiş gecikmesi hesaba katılmaz. Vergi/yatırım tavsiyesi değildir. Yatırım fonları için <a class="underline" href="/simulasyon">simülasyon</a>.</p>
+</Base>

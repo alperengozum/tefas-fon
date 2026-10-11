@@ -25,7 +25,7 @@ const missing = codes.filter((c) => !funds.some((f) => f.code === c));
 ---
 <Base title="Simülasyon · TEFAS Fon Analiz" description="Geçmişte şu fonu alsaydım ne olurdu? Aylık düzenli alım (XIRR) ve tek seferlik alım simülasyonu, endekslerle kıyaslı." noindex={Astro.url.search !== ""}>
   <h1 class="mb-1 text-xl font-semibold">Yatırım simülasyonu</h1>
-  <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; vergi ve fon masrafı ayrıca hesaba katılmaz (fiyata zaten yansır).</p>
+  <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; vergi ve fon masrafı ayrıca hesaba katılmaz (fiyata zaten yansır). Emeklilik fonları için devlet katkısı ve hak edişli <a class="underline" href="/bes-simulasyon">BES simülasyonu</a>.</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
     <div class="flex flex-col gap-1">Fonlar <span class="text-xs text-muted-foreground">en fazla 6, endeksler her zaman eklenir</span><FundPicker client:only="react" name="codes" initial={codes} max={6} /></div>
     <label class="flex flex-col gap-1">Aylık tutar (₺)<input name="monthly" type="number" min="1" value={monthly} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
