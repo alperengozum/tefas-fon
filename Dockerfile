@@ -7,7 +7,9 @@ RUN npm run build
 
 FROM node:22-alpine
 WORKDIR /app
-ENV NODE_ENV=production HOST=0.0.0.0 PORT=4321
+# HOST="::" (IPv4+IPv6): alpine'de "localhost" önce ::1'e çözülüyor; 0.0.0.0 sadece IPv4 dinlediği için Coolify
+# healthcheck'i (wget localhost:4321/healthz) "Connection refused" alıp deploy'u geri alıyordu
+ENV NODE_ENV=production HOST=:: PORT=4321
 # fon OG görseli (/og/fon/KOD.png): sharp/librsvg SVG metnini sistem fontuyla çizer, alpine'de font yok
 RUN apk add --no-cache font-dejavu
 COPY package*.json ./
