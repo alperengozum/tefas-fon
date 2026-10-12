@@ -1,9 +1,9 @@
 // KAP "Portföy Dağılım Raporu" PDF'lerinden fonların hisse portföyünü çıkarır: node scripts/holdings.mjs [gün]
 // Akış: funds/byCriteria (günlük pencere) -> fon başına son PDR -> attachment-detail -> PDF -> HİSSE SENETLERİ tablosu.
 import pg from "pg";
-import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { POOL_OPTS, applySchema } from "./schema.mjs";
 import { allocData, post } from "./tefas.mjs";
 
 const KAP = "https://www.kap.org.tr/tr/";
@@ -235,8 +235,8 @@ async function reportAlloc(db) {
 const PARSER_V = 3; // ayrıştırıcı iyileşince artır: eski sürümle işlenen fonlar yeniden okunur
 
 async function main() {
-  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
-  await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas", ...POOL_OPTS });
+  await applySchema(db);
   await seedHist(db);
   if (process.argv[2] === "gecmis") { await backfillPrev(db); await db.end(); return; }
   // aylık raporlayan fonlar için 75 gün geriye bak (günlük pencere başına 1 istek)

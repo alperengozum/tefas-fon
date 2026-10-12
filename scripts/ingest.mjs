@@ -1,14 +1,14 @@
 // TEFAS yeni JSON API'sinden (auth'suz) fon verisi çeker: node scripts/ingest.mjs [gün=400]
 import pg from "pg";
-import { readFileSync } from "node:fs";
+import { POOL_OPTS, applySchema } from "./schema.mjs";
 import { HDR, allocData, post, ymd } from "./tefas.mjs";
 
 const KINDS = ["YAT", "EMK", "BYF", "GYF", "GSYF"];
 const addDays = (d, n) => new Date(d.getTime() + n * 864e5);
 
 if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw new Error("DATABASE_URL tanımlı değil");
-const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas" });
-await db.query(readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8"));
+const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas", ...POOL_OPTS });
+await applySchema(db);
 if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece şema
 if (process.argv[2] === "vol") { await computeVol(); await db.end(); process.exit(0); } // sadece volatilite
 if (process.argv[2] === "bench") { await fetchBench(); await db.end(); process.exit(0); } // sadece benchmark
