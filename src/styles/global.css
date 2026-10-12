@@ -129,6 +129,13 @@
     }
 }
 
+/* Recharts varsayılan ipucu kutusu beyaz zeminli: koyu temada yazı okunmuyordu */
+.recharts-default-tooltip {
+  background-color: var(--popover) !important;
+  border-color: var(--border) !important;
+  color: var(--popover-foreground);
+}
+
 @media print {
   .no-print { display: none !important; }
 }

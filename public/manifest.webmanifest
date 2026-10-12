@@ -1,0 +1,26 @@
+{
+  "name": "TEFAS Fon Analiz",
+  "short_name": "Fon Analiz",
+  "description": "TEFAS yatırım, emeklilik (BES) ve borsa yatırım fonlarını listeleme, analiz ve karşılaştırma",
+  "lang": "tr",
+  "dir": "ltr",
+  "id": "/",
+  "start_url": "/fonlar/yat",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "categories": ["finance"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Portföyüm", "url": "/portfoy", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Karşılaştır", "url": "/karsilastir", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Taramalar", "url": "/tarama", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Emeklilik (BES)", "url": "/fonlar/bes", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

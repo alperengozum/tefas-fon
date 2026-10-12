@@ -23,6 +23,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
+- **PWA ve tema**: ana ekrana eklenebilir (manifest, ikonlar), service worker ile daha önce açılan sayfalar çevrimdışı da açılır; Sistem / Açık / Koyu tema düğmesi (tarayıcıda hatırlanır, yazdırırken açık)
 - **API ve MCP**: sürümlü JSON API (`/api/v1`, OpenAPI: `/api/v1/openapi.json`) ve AI asistanları için MCP sunucusu (`/mcp`, Streamable HTTP; araçlar: search_funds, get_fund, funds_holding_stock, compare_funds, run_scan). Kimlik doğrulama yok, CORS açık, IP başına dakikada 60 istek. Belge: `/api`
 
 ## Ekran görüntüleri
