@@ -1,7 +1,8 @@
 #!/bin/sh
 # Şemayı hazırla, ingest + hisse portföyü (KAP) çekimini arka planda günlük döngüde çalıştır, web sunucusunu başlat.
 # ponytail: konteyner içi döngü (sunucu yeniden başlarsa ingest de baştan başlar); ayrı cron/worker gerekirse ayrılır.
-node scripts/ingest.mjs init || exit 1
+# şema kilidi alınamazsa (lock_timeout, bkz. scripts/schema.mjs) sunucuyu bekletme: döngüdeki ingest şemayı yeniden uygular
+node scripts/ingest.mjs init && echo "şema hazır" || echo "UYARI: şema uygulanamadı, sunucu yine başlıyor"
 # nice: PDF ayrıştırma vb. web isteklerinin CPU'sunu çalmasın
 # TEFAS fiyatları ~10:00'da açıklanıyor, bazı fonlar geç: her gün 10:00 ve 12:00 (TR, UTC+3 sabit) çek.
 # Konteynerde tzdata yok, bu yüzden epoch'a +3 saat ekleyip gün içi saniyeyi hesaplıyoruz.
