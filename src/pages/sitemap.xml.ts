@@ -15,7 +15,7 @@ export const GET: APIRoute = async ({ site }) => {
     ...["yat", "bes", "byf", "gyf"].map((k) => e(`/fonlar/${k}`, 1)),
     e("/tarama", 0.8), ...SCANS.map((s) => e(`/tarama/${s.slug}`, 0.8)),
     e("/kurucu", 0.7), ...[...new Set(lists.flatMap((l) => aggregate(l.funds).map((r) => r.slug)))].map((sl) => e(`/kurucu/${sl}`, 0.6)),
-    ...["/karsilastir", "/hisse", "/portfoy", "/simulasyon", "/bes-simulasyon", "/hedef"].map((p) => e(p, 0.5, null)),
+    ...["/karsilastir", "/hisse", "/portfoy", "/simulasyon", "/bes-simulasyon", "/hedef", "/api"].map((p) => e(p, 0.5, null)),
     ...lists.flatMap((l) => l.funds.filter((f) => f.active).map((f) => e(`/fon/${f.code}`, 0.7))),
     ...tickers.map((t) => e(`/hisse/${encodeURIComponent(t)}`, 0.4)),
   ];

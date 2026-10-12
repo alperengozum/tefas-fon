@@ -1,0 +1,64 @@
+---
+import Base from "../../layouts/Base.astro";
+import { abs } from "../../lib/seo";
+import { SCANS } from "../../lib/scans";
+import { API_LIMIT, SORT_KEYS } from "../../lib/api";
+
+const o = abs(Astro.site, "/").replace(/\/$/, "");
+const ENDPOINTS: [string, string, string][] = [
+  ["GET", "/api/v1/funds?kind=yat&q=altın&sort=y1&limit=10", "Fon ara, filtrele, sırala. kind: yat | bes | byf | gyf | all; type, founder, min_size, active=0, order, offset"],
+  ["GET", "/api/v1/funds/AFT?history=365", "Fon detayı: getiriler, endeks kıyası, risk, varlık dağılımı, KAP hisse portföyü; history = günlük fiyat geçmişi (gün)"],
+  ["GET", "/api/v1/stocks/THYAO?min_weight=1", "Hisseyi tutan fonlar: ağırlık ve tahmini TL pozisyon"],
+  ["GET", "/api/v1/compare?codes=AFT,TCD", "2-10 fon: getiriler ve 1 yıllık günlük getiri korelasyonu"],
+  ["GET", `/api/v1/scans/${SCANS[0].slug}`, "Hazır tarama sonucu"],
+  ["GET", "/api/v1/openapi.json", "OpenAPI 3.1 belgesi"],
+  ["POST", "/mcp", "MCP sunucusu (Streamable HTTP, durumsuz)"],
+];
+const TOOLS: [string, string][] = [
+  ["search_funds", "Fon ara ve sırala (kod/ad, tür, tip, kurucu, getiri vadesi, büyüklük…)"],
+  ["get_fund", "Fon detayı, isteğe bağlı fiyat geçmişi"],
+  ["funds_holding_stock", "Bir hisseyi tutan fonlar"],
+  ["compare_funds", "2-10 fonu karşılaştır"],
+  ["run_scan", "Hazır taramalardan birini çalıştır"],
+];
+const pre = "overflow-x-auto rounded-lg border bg-muted/40 p-3 text-xs";
+---
+<Base title="API ve MCP · TEFAS Fon Analiz" description="TEFAS fon verisi için ücretsiz JSON API (OpenAPI) ve AI asistanları için MCP sunucusu: fon arama, detay, hisseyi tutan fonlar, karşılaştırma." crumbs={[{ name: "API ve MCP", path: "/api" }]}>
+  <div class="max-w-4xl">
+    <h1 class="mb-2 text-xl font-semibold">API ve MCP</h1>
+    <p class="mb-6 text-sm text-muted-foreground">
+      Kimlik doğrulama yok, CORS açık. IP başına dakikada {API_LIMIT} istek (aşılınca 429 + <code>Retry-After</code>; kalan hak <code>X-RateLimit-Remaining</code> başlığında).
+      Veri günde bir güncellenir; yanıtlar 5 dk önbelleklenebilir. Getiriler %, tutarlar TL. Ticari olmayan kullanım içindir
+      (<a class="underline" href="https://github.com/alperengozum/tefas-fon/blob/main/LICENSE">PolyForm Noncommercial</a>), yatırım tavsiyesi değildir.
+    </p>
+
+    <h2 class="mb-3 font-semibold">REST (JSON)</h2>
+    <div class="mb-3 overflow-x-auto rounded-lg border">
+      <table class="w-full text-sm">
+        <tbody>
+          {ENDPOINTS.map(([m, path, d]) => (
+            <tr class="border-t first:border-t-0"><td class="p-2 align-top font-mono text-xs">{m}</td><td class="p-2 align-top font-mono text-xs">{m === "GET" ? <a class="underline" href={path}>{path}</a> : path}</td><td class="p-2 text-muted-foreground">{d}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <p class="mb-3 text-xs text-muted-foreground">Sıralama alanları: {SORT_KEYS.join(", ")} (d1…y5 getiri vadeleri, flow_m1 = 1 aylık tahmini net giriş).</p>
+    <pre class={`${pre} mb-8`}>{`curl '${o}/api/v1/funds?kind=yat&type=Hisse%20Senedi&sort=y1&limit=5'
+curl '${o}/api/v1/funds/AFT?history=30'`}</pre>
+
+    <h2 class="mb-3 font-semibold">MCP sunucusu</h2>
+    <p class="mb-3 text-sm text-muted-foreground">Claude, ChatGPT, Cursor gibi MCP destekleyen asistanlara fon verisini araç olarak ekler. Adres: <code class="font-mono">{o}/mcp</code> (Streamable HTTP, oturumsuz).</p>
+    <ul class="mb-4 space-y-1 text-sm">
+      {TOOLS.map(([n, d]) => <li><code class="font-mono font-medium">{n}</code> <span class="text-muted-foreground">· {d}</span></li>)}
+    </ul>
+    <p class="mb-1 text-sm font-medium">Claude Code</p>
+    <pre class={`${pre} mb-3`}>{`claude mcp add --transport http tefas-fon ${o}/mcp`}</pre>
+    <p class="mb-1 text-sm font-medium">JSON yapılandırması (Claude Desktop, Cursor, …)</p>
+    <pre class={`${pre} mb-3`}>{JSON.stringify({ mcpServers: { "tefas-fon": { type: "http", url: `${o}/mcp` } } }, null, 2)}</pre>
+    <p class="mb-1 text-sm font-medium">Elle deneme</p>
+    <pre class={`${pre} mb-8`}>{`curl -X POST ${o}/mcp -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_fund","arguments":{"code":"AFT"}}}'`}</pre>
+
+    <p class="text-xs text-muted-foreground">Sitenin kendi istemcisinin kullandığı <code>/api/funds/*</code> ve <code>/api/holdings</code> uçları sıkıştırılmış/iç biçimdir ve haber vermeden değişebilir; dış kullanım için <code>/api/v1</code> kullanın.</p>
+  </div>
+</Base>
