@@ -14,6 +14,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Risk ve getiri kalitesi**: maks. düşüş ve toparlanma süresi, Sharpe/Sortino, kategorisindeki sırası, aylık/yıllık takvim getirileri; listede Risk sekmesi
 - **Endekslere karşı**: BIST 100, USD/TRY ve gram altınla getiri kıyası; BIST 100 betası ve korelasyonu, kayan 3 aylık getiri dağılımı
 - **Rakipler ve örtüşme**: aynı kategorideki rakip fonlar, hisse portföyü en çok örtüşen fonlar
+- **Hisse sepeti vs fon**: KAP raporundaki hisse ağırlıkları dönem boyunca değişmeseydi sepetin getirisi ve fona katkısı; fonun gerçek getirisiyle farkı (hisse dışı varlıklar + dönem içi alım-satım + giderler), BIST 100 kıyası, en çok katkı/kayıp veren hisseler. Son rapor (bugüne kadar) ve bir önceki rapor dönemi
 - **Karşılaştırma**: en fazla 10 fon; 100'e endeksli grafik, getiri korelasyonu ve hisse örtüşme matrisi
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
 - **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans. Adresi paylaşılabilir
@@ -96,6 +97,7 @@ npm run dev          # http://localhost:4321
 | `npm run ingest -- vol` | Volatiliteyi yeniden hesapla |
 | `npm run holdings` | KAP hisse portföylerini çek (her rapor `holdings_hist` geçmişine de yazılır) |
 | `npm run holdings -- gecmis` | Fonların bir önceki KAP raporunu indirip geçmişe yaz ("önceki rapora göre değişim" hemen dolsun; bir kez, yavaş) |
+| `npm run stocks` | KAP portföylerindeki hisselerin düzeltilmiş kapanışları (Yahoo Finance, ~3 dk; günlük döngüde holdings sonrası çalışır) |
 | `npm test` | Birim testleri (PDF ayrıştırıcı, istatistik) |
 | `npm run test:e2e` | Playwright e2e testleri |
 
