@@ -1,6 +1,8 @@
 import pg from "pg";
 import { classify, fold, riskOf } from "./classify";
 import { median } from "./stats";
+import { diffHoldings, type HoldDiff } from "./holdingsDiff";
+import { cached as lru } from "./cache";
 import { mergeRules, STOPAJ_RULES } from "./stopaj-rules.mjs";
 
 type StopajRule = (typeof STOPAJ_RULES)[number];
@@ -86,20 +88,7 @@ export function listFunds(kind: string): Promise<Listed> {
   return p;
 }
 
-// Genel amaçlı TTL önbelleği (anahtar başına Promise; hata önbelleklenmez, en fazla 500 kayıt, en eski önce atılır).
-// ponytail: süreç içi Map, tek konteyner; birden çok örnek olursa Redis. Veri günde bir değiştiği için 10 dk bayatlık kabul.
-function cached<A extends unknown[], T>(fn: (...a: A) => Promise<T>, key: (...a: A) => string) {
-  const m = new Map<string, { t: number; p: Promise<T> }>();
-  return (...a: A): Promise<T> => {
-    const k = key(...a), hit = m.get(k);
-    if (hit && Date.now() - hit.t < TTL) return hit.p;
-    const p = fn(...a);
-    m.set(k, { t: Date.now(), p });
-    p.catch(() => m.delete(k));
-    if (m.size > 500) m.delete(m.keys().next().value!);
-    return p;
-  };
-}
+const cached = <A extends unknown[], T>(fn: (...a: A) => Promise<T>, key: (...a: A) => string) => lru(fn, key, TTL);
 
 export type Detail = {
   code: string; name: string; kind: string;
@@ -152,7 +141,7 @@ export const getHoldings = cached(async (code: string): Promise<{ holdings: Hold
     pool.query(`SELECT ticker, weight FROM holdings WHERE code=$1 ORDER BY weight DESC`, [code]),
     pool.query(`SELECT report, published::text, note FROM holdings_meta WHERE code=$1`, [code]),
   ]);
-  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: m.rowCount > 0 };
+  return { holdings: h.rows, report: m.rows[0]?.report ?? null, published: m.rows[0]?.published ?? null, note: m.rows[0]?.note ?? null, seen: (m.rowCount ?? 0) > 0 };
 }, (code) => code);
 
 export type Notif = { disclosure_index: number; published: string; subject: string; url: string | null };
@@ -211,6 +200,32 @@ export const overlapping = cached(async (code: string, n = 8): Promise<{ code: s
 )).rows, (code, n) => `${code}|${n}`);
 
 // Bir hisseyi tutan tüm fonlar: ağırlık, fon büyüklüğü ve tahmini pozisyon (ağırlık x büyüklük)
+// Fonun son iki KAP raporu arasında hisse değişimleri (holdings_hist). Tek rapor varsa null.
+export const getHoldingsChange = cached(async (code: string): Promise<{ cur: string; prev: string; diff: HoldDiff } | null> => {
+  const { rows } = await pool.query(
+    `WITH p AS (SELECT DISTINCT period, report FROM holdings_hist WHERE code=$1 ORDER BY period DESC LIMIT 2)
+     SELECT p.period::text, p.report, h.ticker, h.weight FROM p JOIN holdings_hist h ON h.code=$1 AND h.period=p.period`, [code]);
+  const periods = [...new Set(rows.map((r) => r.period))].sort().reverse();
+  if (periods.length < 2) return null;
+  const at = (p: string) => rows.filter((r) => r.period === p).map((r) => ({ ticker: r.ticker, weight: r.weight }));
+  return { cur: rows.find((r) => r.period === periods[0]).report, prev: rows.find((r) => r.period === periods[1]).report, diff: diffHoldings(at(periods[1]), at(periods[0])) };
+}, (code) => code);
+
+// Bir hissenin fonlardaki son iki rapor ağırlığı: { kod: { prev, cur } } (cur null = son raporda çıkarmış). Geçmişi tek rapor olan fon yok.
+export const tickerChanges = cached(async (ticker: string): Promise<Record<string, { prev: number | null; cur: number | null; name: string }>> => {
+  const { rows } = await pool.query(
+    `WITH p AS (SELECT code, period, row_number() OVER (PARTITION BY code ORDER BY period DESC) rn FROM (SELECT DISTINCT code, period FROM holdings_hist) t),
+     touched AS (SELECT DISTINCT code FROM holdings_hist WHERE ticker=$1)
+     SELECT p1.code, cur.weight AS cur, prev.weight AS prev, i.name FROM p p1
+     JOIN touched USING (code)
+     JOIN p p2 ON p2.code = p1.code AND p2.rn = 2
+     LEFT JOIN holdings_hist cur ON cur.code = p1.code AND cur.period = p1.period AND cur.ticker = $1
+     LEFT JOIN holdings_hist prev ON prev.code = p1.code AND prev.period = p2.period AND prev.ticker = $1
+     JOIN LATERAL (SELECT name FROM info WHERE code = p1.code ORDER BY date DESC LIMIT 1) i ON true
+     WHERE p1.rn = 1 AND (cur.weight IS NOT NULL OR prev.weight IS NOT NULL)`, [ticker]);
+  return Object.fromEntries(rows.map((r) => [r.code, { prev: r.prev, cur: r.cur, name: r.name }]));
+}, (t) => t);
+
 export const tickerFunds = cached(async (ticker: string): Promise<{ code: string; name: string; kind: string; weight: number; size: number | null; amount: number | null }[]> => (await pool.query(
   `SELECT h.code, i.name, i.kind, h.weight, i.size, h.weight / 100 * i.size AS amount FROM holdings h
    JOIN LATERAL (SELECT name, kind, size FROM info WHERE code = h.code ORDER BY date DESC LIMIT 1) i ON true

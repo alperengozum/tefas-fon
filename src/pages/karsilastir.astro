@@ -25,7 +25,7 @@ const tickers = [...new Set(hold.flatMap((h) => h.holdings.slice(0, 15).map((x) 
 const keys = [...new Set(funds.flatMap((f) => Object.keys(f.alloc)))]
   .sort((a, b) => Math.max(...funds.map((f) => f.alloc[b] ?? 0)) - Math.max(...funds.map((f) => f.alloc[a] ?? 0)));
 ---
-<Base title="Fon Karşılaştırma · TEFAS Fon Analiz">
+<Base title="Fon Karşılaştırma · TEFAS Fon Analiz" description="En fazla 10 TEFAS fonunu getiri grafiği, korelasyon ve hisse örtüşmesiyle karşılaştırın." noindex={Astro.url.search !== ""}>
   <h1 class="mb-4 text-xl font-semibold">Fon Karşılaştırma</h1>
   <form class="mb-6 flex flex-wrap items-end gap-3" method="get">
     <FundPicker client:only="react" name="codes" initial={codes} max={10} />

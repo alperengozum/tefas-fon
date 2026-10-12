@@ -52,3 +52,7 @@ CREATE TABLE IF NOT EXISTS stopaj_rule (
 );
 -- son 1 yılın en büyük düşüşü (%, ≤ 0): zirveden dibe; volatiliteyle aynı geçişte hesaplanır
 ALTER TABLE fund_vol ADD COLUMN IF NOT EXISTS mdd double precision;
+-- hisse portföyü geçmişi: her KAP raporu dönemi (period: dönem sonu günü) için hisse ağırlıkları; holdings son raporun kopyası.
+-- Fon detayı ve hisse sayfası son iki raporu karşılaştırır (scripts/holdings.mjs yazar; 'gecmis' komutu bir önceki raporu doldurur)
+CREATE TABLE IF NOT EXISTS holdings_hist (code text NOT NULL, period date NOT NULL, report text NOT NULL, ticker text NOT NULL, weight double precision NOT NULL, PRIMARY KEY (code, period, ticker));
+CREATE INDEX IF NOT EXISTS holdings_hist_ticker ON holdings_hist (ticker);

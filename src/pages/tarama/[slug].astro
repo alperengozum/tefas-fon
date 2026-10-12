@@ -1,0 +1,36 @@
+---
+import Base from "../../layouts/Base.astro";
+import { listFunds } from "../../lib/db";
+import { COLS, runScan, SCANS } from "../../lib/scans";
+import { pct, tl, tone, trDate } from "../../lib/format";
+
+const s = SCANS.find((x) => x.slug === Astro.params.slug);
+if (!s) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
+const { ref, funds } = await listFunds(s.kind);
+const rows = runScan(s, funds);
+const fmt = (k: keyof typeof COLS, v: number | null) => (k === "size" || k === "flow_m1" ? tl(v) : pct(v));
+const list = s.kind === "EMK" ? ["Emeklilik Fonları", "/fonlar/bes"] : ["Yatırım Fonları", "/fonlar/yat"];
+---
+<Base title={`${s.title} · TEFAS Fon Analiz`} description={`${s.description} ${trDate(ref)} TEFAS verisiyle ilk ${rows.length} fon.`}
+  crumbs={[{ name: list[0], path: list[1] }, { name: "Taramalar", path: "/tarama" }, { name: s.title, path: `/tarama/${s.slug}` }]}>
+  <nav class="mb-2 text-xs text-muted-foreground"><a class="hover:underline" href="/tarama">Taramalar</a> ›</nav>
+  <h1 class="mb-1 text-xl font-semibold">{s.title}</h1>
+  <p class="mb-4 text-sm text-muted-foreground">{s.description} Veri tarihi {trDate(ref)}, aktif ve 10 mn ₺ üstü fonlar. Geçmiş getiri gelecek getiriyi garanti etmez.</p>
+  {rows.length === 0 ? <p class="text-muted-foreground">Bu taramaya uyan fon yok.</p> : (
+    <div class="overflow-x-auto rounded-lg border">
+      <table class="w-full text-sm tabular-nums" data-testid="tarama-tablo">
+        <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">#</th><th class="p-2 text-left">Fon</th>{s.cols.map((k) => <th class="p-2">{COLS[k]}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((f, i) => (
+            <tr class="border-t">
+              <td class="p-2 text-left text-muted-foreground">{i + 1}</td>
+              <td class="p-2 text-left"><a class="hover:underline" href={`/fon/${f.code}`}><b>{f.code}</b> <span class="text-muted-foreground">{f.name}</span></a></td>
+              {s.cols.map((k) => <td class={`p-2 text-right ${k === "size" ? "" : tone(f[k])}`}>{fmt(k, f[k])}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+  <p class="mt-4 text-sm"><a class="underline" href={list[1]}>Tüm listede filtrele ve sırala →</a></p>
+</Base>

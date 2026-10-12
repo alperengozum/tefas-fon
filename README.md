@@ -18,9 +18,12 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
 - **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans, portföy volatilitesi ve fon başına risk katkısı, hedef ağırlıklara göre yeniden dengeleme (ek nakit / satış yapmadan). Adresi paylaşılabilir
 - **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı; stopaj sonrası net getiri
+- **Hazır taramalar**: en çok kazandıran hisse/BES fonları, düşük riskli yüksek getirili, en çok para girişi/çıkışı, en büyük, altın ve döviz fonları, katılıma uygun fonlar (genel, hisse, BES) (`/tarama`, sunucuda çizilir)
+- **SEO / agent**: sayfa başına açıklama, canonical, Open Graph/Twitter kartı (fon başına dinamik görsel `/og/fon/KOD.png`), JSON-LD; DB'den `sitemap.xml`, AI tarayıcılarına açık `robots.txt`, agent'lar için `llms.txt`. Prod adresi `SITE_URL` (varsayılan canlı demo)
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
+- **API ve MCP**: sürümlü JSON API (`/api/v1`, OpenAPI: `/api/v1/openapi.json`) ve AI asistanları için MCP sunucusu (`/mcp`, Streamable HTTP; araçlar: search_funds, get_fund, funds_holding_stock, compare_funds, run_scan). Kimlik doğrulama yok, CORS açık, IP başına dakikada 60 istek. Belge: `/api`
 
 ## Ekran görüntüleri
 
@@ -90,7 +93,8 @@ npm run dev          # http://localhost:4321
 | `npm run build` / `npm start` | Üretim derlemesi ve sunucu |
 | `npm run ingest [gün]` | TEFAS verisini çek |
 | `npm run ingest -- vol` | Volatiliteyi yeniden hesapla |
-| `npm run holdings` | KAP hisse portföylerini çek |
+| `npm run holdings` | KAP hisse portföylerini çek (her rapor `holdings_hist` geçmişine de yazılır) |
+| `npm run holdings -- gecmis` | Fonların bir önceki KAP raporunu indirip geçmişe yaz ("önceki rapora göre değişim" hemen dolsun; bir kez, yavaş) |
 | `npm run stopaj-watch` | Resmi Gazete'de yeni fon stopajı kararı ara (aşağıya bakın) |
 | `npm test` | Birim testleri (PDF ayrıştırıcı, istatistik) |
 | `npm run test:e2e` | Playwright e2e testleri |

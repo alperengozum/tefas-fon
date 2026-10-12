@@ -8,6 +8,8 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=4321
+# fon OG görseli (/og/fon/KOD.png): sharp/librsvg SVG metnini sistem fontuyla çizer, alpine'de font yok
+RUN apk add --no-cache font-dejavu
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist

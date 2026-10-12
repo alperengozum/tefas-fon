@@ -1,33 +1,50 @@
 ---
 import Base from "../../layouts/Base.astro";
-import { tickerFunds } from "../../lib/db";
-import { tl } from "../../lib/format";
+import { tickerChanges, tickerFunds } from "../../lib/db";
+import { tl, tone } from "../../lib/format";
 
 const ticker = (Astro.params.ticker ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-const rows = ticker.length >= 2 ? await tickerFunds(ticker) : [];
-if (!rows.length) return new Response("Bu hisseyi tutan fon bulunamadı", { status: 404 });
+const [rows, changes] = ticker.length >= 2 ? await Promise.all([tickerFunds(ticker), tickerChanges(ticker)]) : [[], {}];
+if (!rows.length) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
 const total = rows.reduce((s, r) => s + (r.amount ?? 0), 0);
+// son KAP raporunda hisseyi tamamen çıkaran fonlar (geçmişi en az iki rapor olanlar)
+const exited = Object.entries(changes).filter(([, c]) => c.cur == null && c.prev != null).sort((a, b) => b[1].prev! - a[1].prev!);
+const delta = (code: string) => { const c = changes[code]; return c ? (c.cur ?? 0) - (c.prev ?? 0) : null; };
+const entered = rows.filter((r) => changes[r.code] && changes[r.code].prev == null).length;
 ---
-<Base title={`${ticker} hissesini tutan fonlar · TEFAS Fon Analiz`}>
+<Base title={`${ticker} hissesini tutan fonlar · TEFAS Fon Analiz`}
+  description={`${ticker} hissesini portföyünde tutan ${rows.length} yatırım fonu, ağırlıkları, tahmini TL pozisyonları ve önceki rapora göre değişim (KAP Portföy Dağılım Raporları).`}
+  crumbs={[{ name: "Hisse Ara", path: "/hisse" }, { name: ticker, path: `/hisse/${ticker}` }]}>
   <h1 class="mb-1 text-xl font-semibold">{ticker} <span class="text-base font-normal text-muted-foreground">hissesini tutan fonlar</span></h1>
   <p class="mb-4 text-sm text-muted-foreground">
     {rows.length} fon · tahmini toplam pozisyon <b class="text-foreground">{tl(total)}</b> (ağırlık × fon büyüklüğü; KAP raporu tarihindeki ağırlık, güncel büyüklük).
+    {(entered > 0 || exited.length > 0) && <span data-testid="hisse-degisim-ozet"> Son raporda <b class="text-foreground">{entered}</b> fon yeni aldı, <b class="text-foreground">{exited.length}</b> fon çıkardı.</span>}
     <a class="underline" href={`/fonlar/yat?hisse=${ticker}`}>Fon listesinde filtrele</a>
   </p>
   <div class="overflow-x-auto rounded-lg border">
-    <table class="w-full text-sm tabular-nums">
-      <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Tür</th><th class="p-2">Ağırlık</th><th class="p-2">Fon büyüklüğü</th><th class="p-2">Tahmini pozisyon</th></tr></thead>
+    <table class="w-full text-sm tabular-nums" data-testid="hisse-fonlar">
+      <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Tür</th><th class="p-2">Ağırlık</th><th class="p-2" title="önceki KAP raporuna göre, puan">Değişim</th><th class="p-2">Fon büyüklüğü</th><th class="p-2">Tahmini pozisyon</th></tr></thead>
       <tbody>
-        {rows.map((r) => (
+        {rows.map((r) => { const d = delta(r.code), isNew = changes[r.code] && changes[r.code].prev == null; return (
           <tr class="border-t">
             <td class="p-2"><a class="hover:underline" href={`/fon/${r.code}`}><b>{r.code}</b> <span class="text-muted-foreground">{r.name}</span></a></td>
             <td class="p-2 text-right">{r.kind}</td>
             <td class="p-2 text-right">{r.weight.toFixed(2)}%</td>
+            <td class={`p-2 text-right ${isNew ? "text-emerald-600 dark:text-emerald-400" : tone(d)}`}>{isNew ? "yeni" : d == null ? "–" : `${d > 0 ? "+" : ""}${d.toFixed(2)}`}</td>
             <td class="p-2 text-right">{tl(r.size)}</td>
             <td class="p-2 text-right">{tl(r.amount)}</td>
           </tr>
-        ))}
+        ); })}
       </tbody>
     </table>
   </div>
+  {exited.length > 0 && (
+    <section class="mt-6" data-testid="hisse-cikaranlar">
+      <h2 class="mb-2 font-semibold">Son raporda çıkaran fonlar</h2>
+      <ul class="space-y-1 text-sm">
+        {exited.map(([code, c]) => <li><a class="hover:underline" href={`/fon/${code}`}><b>{code}</b> <span class="text-muted-foreground">{c.name}</span></a> <span class="tabular-nums text-red-600 dark:text-red-400">önceki ağırlık {c.prev!.toFixed(2)}%</span></li>)}
+      </ul>
+    </section>
+  )}
+  <p class="mt-4 text-xs text-muted-foreground">Değişim: fonun son iki KAP portföy raporu arasındaki ağırlık farkı (puan); fiyat hareketini de içerir. "–": fonun tek raporu var.</p>
 </Base>

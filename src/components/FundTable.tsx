@@ -1,7 +1,10 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Fund } from "../lib/db";
-import { decodeFunds } from "../lib/compact";
+import { decodeList } from "../lib/compact";
+import { inBase, PERIOD_DAYS } from "../lib/analytics";
 import { fold } from "../lib/classify";
+import { download, toCsv, today } from "../lib/csv";
+import { EMPTY, fromQuery, toQuery } from "../lib/listUrl";
 import { type AssetRule, assetName, assetOptions, matches, ruleText, share } from "../lib/assets";
 import { pct, price, tl, tone } from "../lib/format";
 import { usePins } from "../lib/pins";
@@ -24,6 +27,7 @@ const VIEWS: Record<string, { name: string; cols: Col[] }> = {
   nakit: { name: "Nakit Giriş-Çıkışı", cols: [F("flow_w1", "1 Hafta"), F("flow_m1", "1 Ay"), F("flow_m3", "3 Ay"), { key: "size", head: "Büyüklük", fmt: tl }] },
 };
 const MAX_COMPARE = 10;
+const USD_KEYS = new Set(PERIOD_DAYS.map(([k]) => k)); // USD seçiminde çevrilen getiri alanları
 
 // Hızlı filtreler (aç/kapa)
 const FLAGS: { key: keyof Fund; name: string }[] = [
@@ -31,7 +35,6 @@ const FLAGS: { key: keyof Fund; name: string }[] = [
   { key: "qualified", name: "Nitelikli / Özel" }, { key: "oks", name: "OKS" },
 ];
 
-const EMPTY = { q: "", status: "aktif", type: "", founder: "", flags: [] as string[], riskMin: "", riskMax: "", invMin: "", invMax: "", sizeMin: "", sizeMax: "", stockMin: "", stock: "", stockW: "", assets: [] as AssetRule[] };
 // "Tüm Filtreler" paneli kapalıyken de kaç filtrenin açık olduğu görünsün
 const PANEL = ["riskMin", "riskMax", "invMin", "invMax", "sizeMin", "sizeMax", "stockMin"] as const;
 // Sıralama anahtarı: Fund alanı veya "@<varlık>" (varlık kuralı sütunu, ör. "@g:mevduat")
@@ -63,24 +66,36 @@ export default function FundTable({ src }: { src: string }) {
 }
 
 function FundTableView({ data }: { data: string }) {
-  const funds = useMemo(() => decodeFunds(data), [data]);
+  const list = useMemo(() => decodeList(data), [data]);
+  // TL / USD: USD seçiliyken getiri alanları USD/TRY'nin aynı vadeli getirisine göre çevrilir (sıralama ve filtre de çevrilmiş değerle)
+  const [ccy, setCcy] = useState<"TL" | "USD">("TL");
+  const usdOn = ccy === "USD" && !!list.usd;
+  const funds = useMemo(() => {
+    const usd = list.usd;
+    if (ccy === "TL" || !usd) return list.funds;
+    return list.funds.map((x) => ({ ...x, ...Object.fromEntries(PERIOD_DAYS.map(([k]) => [k, inBase(x[k as keyof Fund] as number | null, usd[k])])) }));
+  }, [list, ccy]);
   const { pins, toggle } = usePins();
-  const [view, setView] = useState("getiri");
-  const [f, setF] = useState(EMPTY);
+  // Filtre, görünüm ve sıralama adresten başlar ve adrese yazılır (paylaşılabilir liste; bkz. lib/listUrl)
+  const [init] = useState(() => fromQuery(location.search, Object.keys(VIEWS)));
+  const [view, setView] = useState(init.view);
+  const [f, setF] = useState(init.f);
   const set = (p: Partial<typeof EMPTY>) => setF((x) => ({ ...x, ...p }));
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "size", dir: -1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>(init.sort as { key: SortKey; dir: 1 | -1 });
+  useEffect(() => {
+    const q = toQuery({ f, view, sort });
+    history.replaceState(history.state, "", q ? `${location.pathname}?${q}` : location.pathname);
+  }, [f, view, sort]);
+  const [copied, setCopied] = useState(false);
+  const copyLink = () => navigator.clipboard?.writeText(location.href).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
   // varlık kuralı taslağı (Ekle'ye basılınca f.assets'e geçer)
   const [draft, setDraft] = useState({ a: "", op: "has" as AssetRule["op"], min: "" });
   const [limit, setLimit] = useState(100);
   // Sonsuz kaydırma: tablonun altındaki gözcü görününce +100 satır daha çiz
   const end = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  // Hisse filtresi (KAP portföy raporu): ?hisse=EREGL ile de açılır
+  // Hisse filtresi (KAP portföy raporu): ?hisse=EREGL ile de açılır (fromQuery)
   const [byStock, setByStock] = useState<Record<string, number> | null>(null);
-  useEffect(() => {
-    const q = new URLSearchParams(location.search).get("hisse");
-    if (q) set({ stock: q.toUpperCase(), stockW: "1" });
-  }, []);
   useEffect(() => {
     const t = f.stock.trim().toUpperCase();
     if (t.length < 2) return setByStock(null);
@@ -117,7 +132,7 @@ function FundTableView({ data }: { data: string }) {
       .sort((a, b) => {
         const x = val(a, sort.key), y = val(b, sort.key);
         // pinlenen fonlar her sıralamada en üstte
-        return +pins.has(b.code) - +pins.has(a.code) || (x == null) - (y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
+        return +pins.has(b.code) - +pins.has(a.code) || Number(x == null) - Number(y == null) || (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
       });
   }, [funds, df, sort, byStock, pins]);
 
@@ -141,6 +156,18 @@ function FundTableView({ data }: { data: string }) {
   // "içersin" kuralları tabloda sıralanabilir % sütunu olur
   const assetCols = f.assets.filter((r) => r.op === "has");
   const panelOn = PANEL.filter((k) => f[k]).length + f.assets.length;
+  // CSV: filtrelenmiş ve sıralanmış tüm satırlar (ekrandaki 100 satır sınırı değil); ham sayılar (yüzde/₺ işareti yok)
+  const exportCsv = () => {
+    const extra = [
+      ...(stockCol.length ? [[`${f.stock.toUpperCase()} ağırlık %`, (x: Fund) => byStock?.[x.code]] as const] : []),
+      ...assetCols.map((r) => [`${assetName(r.a)} %`, (x: Fund) => (x.alloc ? share(x.alloc, r.a) : null)] as const),
+      // USD seçiliyken getiri sütunları çevrilmiş değer: başlıkta belirt
+      ...cols.map((c) => [c.fmt === pct ? `${c.head} %${usdOn && USD_KEYS.has(c.key as string) ? " (USD)" : ""}` : c.head, (x: Fund) => x[c.key] as number | null] as const),
+    ];
+    const headers = ["Kod", "Fon", "Tür", "Kurucu", "Durum", "Fiyat", "Büyüklük (₺)", "Yatırımcı", ...extra.map(([h]) => h)];
+    const data = rows.map((x) => [x.code, x.name, x.type, x.founder, x.active ? "aktif" : "pasif", x.price || null, x.size, x.investors, ...extra.map(([, get]) => get(x))]);
+    download(`fonlar-${location.pathname.split("/").pop()}-${VIEWS[view].name.toLocaleLowerCase("tr")}${usdOn ? "-usd" : ""}-${today()}.csv`, toCsv(headers, data));
+  };
   const addRule = () => {
     if (!draft.a) return;
     const r: AssetRule = { a: draft.a, op: draft.op, min: draft.op === "has" ? Math.max(0, Number(draft.min) || 0) : 0 };
@@ -178,6 +205,7 @@ function FundTableView({ data }: { data: string }) {
           </Button>
         ))}
         {active && <Button size="sm" variant="ghost" onClick={() => setF(EMPTY)}>Temizle</Button>}
+        <Button size="sm" variant="ghost" onClick={copyLink} title="Filtre, görünüm ve sıralamayla bu listenin bağlantısı">{copied ? "Kopyalandı" : "Linki kopyala"}</Button>
         {picked.length > 0 && (
           <Button className="ml-auto" onClick={() => (location.href = `/karsilastir?codes=${picked.join(",")}`)}>Karşılaştır ({picked.length})</Button>
         )}
@@ -227,9 +255,20 @@ function FundTableView({ data }: { data: string }) {
         </p>
       </details>
 
-      <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
-        <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs className="max-w-full overflow-x-auto" value={view} onValueChange={(v) => setView(v as string)}>
+          <TabsList>{Object.entries(VIEWS).map(([k, v]) => <TabsTrigger key={k} value={k}>{v.name}</TabsTrigger>)}</TabsList>
+        </Tabs>
+        {list.usd && view !== "buyukluk" && view !== "nakit" && (
+          <div className="flex rounded-md border p-0.5" role="group" aria-label="Getiri para birimi">
+            {(["TL", "USD"] as const).map((c) => (
+              <Button key={c} size="sm" variant={ccy === c ? "default" : "ghost"} aria-pressed={ccy === c} onClick={() => setCcy(c)}>{c === "TL" ? "TL getiri" : "USD bazında"}</Button>
+            ))}
+          </div>
+        )}
+        <Button size="sm" variant="outline" className="ml-auto" onClick={exportCsv} disabled={!rows.length} title="Filtrelenmiş tüm satırlar, açık görünümün sütunlarıyla">CSV indir ({rows.length})</Button>
+      </div>
+      {ccy === "USD" && view !== "buyukluk" && view !== "nakit" && <p className="text-xs text-muted-foreground" data-testid="usd-not">Getiriler USD bazında: (1 + TL getiri) / (1 + USD/TRY getirisi) − 1. Dolar bazında kazandı mı sorusunun cevabı.</p>}
 
       {view === "nakit" && byCat.length > 0 && (
         <div className="flex flex-wrap gap-2 text-xs">

@@ -8,6 +8,7 @@ INSERT INTO f VALUES
   ('DDD','YAT','BETA PORTFÖY ALTIN KATILIM FONU',            4.0, 0.0010, '{"km":90,"r":10}'),
   ('EEE','YAT','GAMA PORTFÖY DEĞİŞKEN FON',                  5.0, 0.0009, '{"hs":40,"r":40,"tr":20}'),
   ('EMA','EMK','TEST EMEKLİLİK VE HAYAT A.Ş. HİSSE SENEDİ EMEKLİLİK YATIRIM FONU', 6.0, 0.0011, '{"hs":80,"r":20}'),
+  ('EMD','EMK','TEST EMEKLİLİK VE HAYAT A.Ş. DEVLET KATKISI EMEKLİLİK YATIRIM FONU', 1.0, 0.0006, '{"dt":70,"r":30}'),
   ('BYA','BYF','ALFA PORTFÖY BORSA YATIRIM FONU',            7.0, 0.0010, '{"hs":100}'),
   ('GYA','GYF','GAMA GAYRİMENKUL YATIRIM FONU',              8.0, 0.0005, '{"gm":100}');
 
@@ -28,3 +29,9 @@ FROM (VALUES ('BIST100', 10000.0), ('USD', 30.0), ('ALTIN', 3000.0)) v(s, base),
 
 -- otomatik stopaj dönemi (scripts/stopaj-watch.mjs kaynaklardan yazar): 400 gün önceden itibaren %10; simülasyon bunu kullanmalı
 INSERT INTO stopaj_rule ("from", a, b, serbest_hy, source) VALUES (current_date - 400, 0.10, 0.10, 0.175, 'Test Kaynağı');
+-- hisse portföyü geçmişi: iki rapor (BBB: ASELS çıktı, EREGL +2,5, THYAO +0,2 eşik altı; EEE: ASELS yeni, EREGL -1,9)
+INSERT INTO holdings_hist VALUES
+  ('BBB', current_date - 40, '7. Ay 2026', 'EREGL', 4.0), ('BBB', current_date - 40, '7. Ay 2026', 'THYAO', 8.0), ('BBB', current_date - 40, '7. Ay 2026', 'ASELS', 5.0),
+  ('BBB', current_date - 10, '8. Ay 2026', 'EREGL', 6.5), ('BBB', current_date - 10, '8. Ay 2026', 'THYAO', 8.2),
+  ('EEE', current_date - 40, '7. Ay 2026', 'EREGL', 5.0),
+  ('EEE', current_date - 10, '8. Ay 2026', 'EREGL', 3.1), ('EEE', current_date - 10, '8. Ay 2026', 'ASELS', 2.4);
