@@ -62,6 +62,7 @@ export function xirr(flows: [string, number][]): number | null {
 export type Sim = {
   n: number; first: string; last: string; invested: number; value: number; ret: number; xirr: number | null; // SIP
   lump: number; lumpAnn: number | null; // tek seferlik: başlangıçtaki fiyattan bitişe getiri %
+  lots: { date: string; units: number; cost: number }[]; start: string; // SIP alımları (stopaj lot bazında); tek seferlik alım günü
 };
 
 // start'tan itibaren her ay aynı gün (yoksa sonraki işlem günü) `monthly` TL alım; end'deki fiyatla değerle.
@@ -70,6 +71,7 @@ export function simulate(h: Pt[], monthly: number, start: string, end: string): 
   if (!endRow?.price) return null; // 0 = fiyat açıklanmadı
   const s = day(start), d0 = new Date(start + "T00:00:00Z");
   const flows: [string, number][] = [];
+  const lots: Sim["lots"] = [];
   let units = 0;
   for (let k = 0; ; k++) {
     const dim = new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + k + 1, 0)).getUTCDate();
@@ -80,6 +82,7 @@ export function simulate(h: Pt[], monthly: number, start: string, end: string): 
     if (day(row.date) - day(want) > GAP || !row.price) continue;
     units += monthly / row.price;
     flows.push([row.date, -monthly]);
+    lots.push({ date: row.date, units: monthly / row.price, cost: monthly });
   }
   const first = firstGE(h, iso(s));
   if (!flows.length || !first?.price || first.date >= endRow.date || day(first.date) - s > GAP) return null;
@@ -90,6 +93,7 @@ export function simulate(h: Pt[], monthly: number, start: string, end: string): 
     n: flows.length, first: flows[0][0], last: endRow.date, invested, value, ret: (value / invested - 1) * 100,
     xirr: days >= 90 ? xirr([...flows, [endRow.date, value]]) : null,
     lump, lumpAnn: days >= 365 ? ((endRow.price / first.price) ** (365 / days) - 1) * 100 : null,
+    lots, start: first.date,
   };
 }
 

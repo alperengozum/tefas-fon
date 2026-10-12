@@ -1,9 +1,11 @@
 ---
 import Base from "../layouts/Base.astro";
 import FundPicker from "../components/FundCombobox";
-import { getBench, getFunds } from "../lib/db";
+import { getBench, getFunds, getStopajRules, type Detail } from "../lib/db";
 import { BENCH } from "../lib/analytics";
-import { simulate } from "../lib/stats";
+import { simulate, type Sim } from "../lib/stats";
+import { afterTax, stopajRate } from "../lib/portfolio";
+import { classify } from "../lib/classify";
 import { pct, tl, tone } from "../lib/format";
 
 const q = Astro.url.searchParams;
@@ -17,15 +19,26 @@ const end = isDate(q.get("end")) ?? today;
 // Sonuç yalnız fon seçilip Hesapla'ya basılınca (adreste codes varken) hesaplanır ve gösterilir
 const calc = codes.length > 0;
 const [{ funds }, bench] = calc ? await Promise.all([getFunds(codes), getBench()]) : [{ funds: [] }, {} as Awaited<ReturnType<typeof getBench>>];
+const { rules, auto } = calc ? await getStopajRules() : { rules: undefined, auto: [] };
+const lastAuto = auto.at(-1);
+// Stopaj sonrası net (yalnız fonlar): SIP'te her alım kendi elde tutma süresiyle; tek seferlik başlangıç gününden
+const net = (f: Detail, sim: Sim | null) => {
+  if (!sim) return null;
+  const tf = { kind: f.kind, name: f.name, stockFocus: classify(f.name, f.kind).stockFocus, stock: f.alloc.hs ?? 0 };
+  const units = sim.lots.reduce((s, l) => s + l.units, 0);
+  const sip = afterTax(tf, sim.lots, sim.value / units, sim.last, rules);
+  const rate = stopajRate(tf, sim.start, sim.last, rules);
+  return { sip: (sip.net / sim.invested - 1) * 100, lump: sim.lump - Math.max(0, sim.lump) * (rate ?? 0), rate };
+};
 const rows = [
-  ...funds.map((f) => ({ code: f.code, name: f.name, sim: simulate(f.history, monthly, start, end) })),
-  ...BENCH.filter(([k]) => bench[k]).map(([k, l]) => ({ code: null, name: l, sim: simulate(bench[k], monthly, start, end) })),
+  ...funds.map((f) => { const sim = simulate(f.history, monthly, start, end); return { code: f.code, name: f.name, sim, net: net(f, sim) }; }),
+  ...BENCH.filter(([k]) => bench[k]).map(([k, l]) => ({ code: null, name: l, sim: simulate(bench[k], monthly, start, end), net: null })),
 ];
 const missing = codes.filter((c) => !funds.some((f) => f.code === c));
 ---
 <Base title="Simülasyon · TEFAS Fon Analiz" description="Geçmişte şu fonu alsaydım ne olurdu? Aylık düzenli alım (XIRR) ve tek seferlik alım simülasyonu, endekslerle kıyaslı." noindex={Astro.url.search !== ""}>
   <h1 class="mb-1 text-xl font-semibold">Yatırım simülasyonu</h1>
-  <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; vergi ve fon masrafı ayrıca hesaba katılmaz (fiyata zaten yansır). Emeklilik fonları için devlet katkısı ve hak edişli <a class="underline" href="/bes-simulasyon">BES simülasyonu</a>; ileriye dönük "hedefime ulaşır mıyım?" için <a class="underline" href="/hedef">hedef planlayıcı</a>.</p>
+  <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; fon masrafı fiyata zaten yansır, stopaj sonrası net getiri ayrı sütunda. Emeklilik fonları için devlet katkısı ve hak edişli <a class="underline" href="/bes-simulasyon">BES simülasyonu</a>; ileriye dönük "hedefime ulaşır mıyım?" için <a class="underline" href="/hedef">hedef planlayıcı</a>.</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
     <div class="flex flex-col gap-1">Fonlar <span class="text-xs text-muted-foreground">en fazla 6, endeksler her zaman eklenir</span><FundPicker client:only="react" name="codes" initial={codes} max={6} /></div>
     <label class="flex flex-col gap-1">Aylık tutar (₺)<input name="monthly" type="number" min="1" value={monthly} class="h-8 w-32 rounded-lg border bg-transparent px-2" /></label>
@@ -39,8 +52,8 @@ const missing = codes.filter((c) => !funds.some((f) => f.code === c));
   <div class="overflow-x-auto rounded-lg border">
     <table class="w-full text-sm tabular-nums">
       <thead class="bg-muted/50 text-right">
-        <tr><th class="p-2 text-left" rowspan="2">Varlık</th><th class="p-2 text-center" colspan="5">Aylık düzenli alım</th><th class="p-2 text-center" colspan="2">Başta tek seferlik</th></tr>
-        <tr><th class="p-2">Alım</th><th class="p-2">Yatırılan</th><th class="p-2">Değer</th><th class="p-2">Getiri</th><th class="p-2">Yıllık (XIRR)</th><th class="p-2">Getiri</th><th class="p-2">Yıllık</th></tr>
+        <tr><th class="p-2 text-left" rowspan="2">Varlık</th><th class="p-2 text-center" colspan="6">Aylık düzenli alım</th><th class="p-2 text-center" colspan="3">Başta tek seferlik</th></tr>
+        <tr><th class="p-2">Alım</th><th class="p-2">Yatırılan</th><th class="p-2">Değer</th><th class="p-2">Getiri</th><th class="p-2">Yıllık (XIRR)</th><th class="p-2">Net (stopaj sonrası)</th><th class="p-2">Getiri</th><th class="p-2">Yıllık</th><th class="p-2">Net (stopaj sonrası)</th></tr>
       </thead>
       <tbody>
         {rows.map((r) => (
@@ -53,15 +66,18 @@ const missing = codes.filter((c) => !funds.some((f) => f.code === c));
                 <td class="p-2 text-right">{tl(r.sim.value)}</td>
                 <td class={`p-2 text-right ${tone(r.sim.ret)}`}>{pct(r.sim.ret)}</td>
                 <td class={`p-2 text-right ${tone(r.sim.xirr)}`}>{r.sim.xirr == null ? "–" : pct(r.sim.xirr * 100)}</td>
+                <td class={`p-2 text-right ${tone(r.net?.sip)}`} data-col="net-sip">{pct(r.net?.sip)}</td>
                 <td class={`p-2 text-right ${tone(r.sim.lump)}`}>{pct(r.sim.lump)}</td>
                 <td class={`p-2 text-right ${tone(r.sim.lumpAnn)}`}>{pct(r.sim.lumpAnn)}</td>
+                <td class={`p-2 text-right ${tone(r.net?.lump)}`} data-col="net-lump" title={r.net ? (r.net.rate == null ? "BES: fon stopajı yok" : `stopaj %${(r.net.rate * 100).toFixed(1)}`) : undefined}>{pct(r.net?.lump)}</td>
               </>
-            ) : <td class="p-2 text-muted-foreground" colspan="7">Bu aralıkta yeterli veri yok</td>}
+            ) : <td class="p-2 text-muted-foreground" colspan="9">Bu aralıkta yeterli veri yok</td>}
           </tr>
         ))}
       </tbody>
     </table>
   </div>
   <p class="mt-3 text-xs text-muted-foreground">Her ay başlangıç günü aynı gün (yoksa sonraki işlem günü) alım yapılır; bitiş fiyatıyla değerlenir. Fon geçmişi ingest edilen kadardır (yaklaşık son 13 ay, günde bir uzar); daha eski başlangıçlarda "veri yok" çıkabilir. Yıllık oran 90 günden kısa sürede gösterilmez. Endeksler: BIST 100 (puan), USD/TRY, gram altın (Yahoo Finance).</p>
+  <p class="mt-1 text-xs text-muted-foreground" data-testid="stopaj-not">Stopaj (gerçek kişi): her alım kendi alış tarihindeki oranla. 9 Temmuz 2025 sonrası alımlarda genel %17,5; öncesinde fon grubuna göre %0–15 (ör. para piyasası/borçlanma 23.12.2020–30.04.2024 arası %0). TEFAS'taki hisse senedi yoğun fonlar %0 (serbest olanlarda 27 Mart 2026 sonrası alımlar %17,5); portföyünün ≥ %51'i BIST hissesi olan fon 1 yıldan, GYF/GSYF 2 yıldan uzun tutulunca %0; BES'te fon stopajı yok. Yalnız kazançlı alımlar vergilenir; vergi tavsiyesi değildir. Oranlar Resmi Gazete takibi ve portföy şirketi/banka stopaj tablolarıyla otomatik güncellenir{lastAuto && <span data-testid="stopaj-oto"> (son güncelleme: {lastAuto.from.split("-").reverse().join(".")} ve sonrası alımlar, kaynak {lastAuto.source})</span>}.</p>
   </>}
 </Base>

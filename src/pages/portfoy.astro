@@ -7,14 +7,18 @@ import CsvButton from "../components/CsvButton";
 import { getBench, getFunds } from "../lib/db";
 import { BENCH, forChart, ret, RETURNS } from "../lib/analytics";
 import { corr, dailyReturns, overlap } from "../lib/stats";
+import { portfolioRisk, rebalance } from "../lib/portfolio";
 import { label, pct, tl, tone } from "../lib/format";
 
-// ?f=AFT:tl:5000&f=TCD:adet:120 (fon:tl|adet:değer, tekrarlı parametre). Form tarayıcıda localStorage'a kaydeder, URL paylaşılabilir.
+// ?f=AFT:tl:5000:60&f=TCD:adet:120 (fon:tl|adet:değer[:hedef %], tekrarlı parametre); &nakit=10000&satma=1 dengeleme seçenekleri.
+// Form tarayıcıda localStorage'a kaydeder, URL paylaşılabilir.
 const entered = Astro.url.searchParams.getAll("f").flatMap((s) => {
-  const [c, m, v] = s.split(":");
-  const n = Number(v);
-  return c && (m === "tl" || m === "adet") && n > 0 ? [{ code: c.toUpperCase(), mode: m as "tl" | "adet", value: n }] : [];
+  const [c, m, v, t] = s.split(":");
+  const n = Number(v), tg = Number(t);
+  return c && (m === "tl" || m === "adet") && n > 0 ? [{ code: c.toUpperCase(), mode: m as "tl" | "adet", value: n, target: tg > 0 ? tg : 0 }] : [];
 }).slice(0, 15);
+const cash = Math.min(Math.max(Number(Astro.url.searchParams.get("nakit")) || 0, 0), 1e12);
+const noSell = Astro.url.searchParams.get("satma") === "1";
 const codes = [...new Set(entered.map((e) => e.code))];
 const [{ funds, holdings }, bench] = await Promise.all([getFunds(codes), codes.length ? getBench() : Promise.resolve({} as Awaited<ReturnType<typeof getBench>>)]);
 const missing = codes.filter((c) => !funds.some((f) => f.code === c));
@@ -57,12 +61,22 @@ const ids = funds.map((f) => f.code);
 const cors = rets.map((a) => rets.map((b) => corr(a, b)));
 const ovl = funds.map((a) => funds.map((b) => { const x = holdings.get(a.code), y = holdings.get(b.code); return x?.length && y?.length ? overlap(x, y) : null; }));
 const hasOvl = ovl.some((r, i) => r.some((v, j) => i !== j && v != null));
-const initial = entered.map((e) => ({ code: e.code, mode: e.mode, value: String(e.value) }));
+const initial = entered.map((e) => ({ code: e.code, mode: e.mode, value: String(e.value), target: e.target ? String(e.target) : "" }));
+
+// Portföy riski (son 1 yıl ortak günler) ve hedef ağırlıklara göre yeniden dengeleme (aynı fon birden çok satırdaysa hedefler toplanır)
+const risk = portfolioRisk(funds.map((f) => w(f.code)), rets);
+const targets = new Map<string, number>();
+for (const e of entered) if (e.target) targets.set(e.code, (targets.get(e.code) ?? 0) + e.target);
+const trades = targets.size ? rebalance(funds.map((f) => ({ code: f.code, value: amounts.get(f.code)!, target: targets.get(f.code) ?? 0 })), cash, noSell) : [];
+const targetSum = [...targets.values()].reduce((s, v) => s + v, 0);
+const afterTotal = total + cash;
+// al/sat emri için tam tutar (tl() "1,5 B" gibi yuvarlar, 1.500 ₺ "2 B ₺" görünürdü)
+const exact = (v: number) => `${Math.round(v).toLocaleString("tr-TR")} ₺`;
 ---
 <Base title="Portföyüm · TEFAS Fon Analiz" description="Fon portföyünüzü kurun: birleşik varlık dağılımı, hisse maruziyeti, fonlar arası örtüşme ve geçmiş performans." noindex={Astro.url.search !== ""}>
   <h1 class="mb-1 text-xl font-semibold">Portföyüm</h1>
   <p class="mb-4 text-sm text-muted-foreground">Fonlarını seç, tutar (₺) ya da adet (pay) gir; birleşik varlık dağılımı, hisse maruziyeti ve fonlar arası örtüşme çıkar. Kayıt yalnız bu tarayıcıda tutulur; adres paylaşılabilir.</p>
-  <PortfolioForm client:only="react" initial={initial} />
+  <PortfolioForm client:only="react" initial={initial} extra={{ cash: cash ? String(cash) : "", noSell }} />
   {missing.length > 0 && <p class="mb-3 text-sm text-red-600">Bulunamadı: {missing.join(", ")}</p>}
   {funds.length === 0 ? <p class="text-muted-foreground">Analiz için en az bir fon ve tutar girin.</p> : (
     <>
@@ -81,13 +95,41 @@ const initial = entered.map((e) => ({ code: e.code, mode: e.mode, value: String(
         </div>
         <div class="overflow-x-auto rounded-lg border">
           <table class="w-full text-sm tabular-nums">
-            <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Adet</th><th class="p-2">Fiyat</th><th class="p-2">Tutar</th><th class="p-2">Pay</th></tr></thead>
-            <tbody>{funds.map((f) => (
-              <tr class="border-t"><td class="p-2 text-left"><a class="hover:underline" href={`/fon/${f.code}`}><b>{f.code}</b> <span class="text-muted-foreground">{f.name}</span></a></td><td class="p-2 text-right">{units.get(f.code)!.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</td><td class="p-2 text-right">{price.get(f.code)!.toFixed(4)}</td><td class="p-2 text-right">{tl(amounts.get(f.code))}</td><td class="p-2 text-right">{(w(f.code) * 100).toFixed(1)}%</td></tr>
+            <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Adet</th><th class="p-2">Fiyat</th><th class="p-2">Tutar</th><th class="p-2">Pay</th>{risk && <th class="p-2" title="portföy varyansına katkı">Risk katkısı</th>}</tr></thead>
+            <tbody>{funds.map((f, i) => (
+              <tr class="border-t"><td class="p-2 text-left"><a class="hover:underline" href={`/fon/${f.code}`}><b>{f.code}</b> <span class="text-muted-foreground">{f.name}</span></a></td><td class="p-2 text-right">{units.get(f.code)!.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}</td><td class="p-2 text-right">{price.get(f.code)!.toFixed(4)}</td><td class="p-2 text-right">{tl(amounts.get(f.code))}</td><td class="p-2 text-right">{(w(f.code) * 100).toFixed(1)}%</td>{risk && <td class={`p-2 text-right ${risk.contrib[i] > w(f.code) * 100 * 1.5 ? "text-amber-600" : ""}`}>{risk.contrib[i].toFixed(1)}%</td>}</tr>
             ))}</tbody>
           </table>
         </div>
       </section>
+
+      {risk && (
+        <section class="mb-8" data-section="portfoy-risk">
+          <h2 class="mb-3 font-semibold">Portföy riski <span class="text-xs font-normal text-muted-foreground">son 1 yıl, fonların ortak {risk.n} günü</span></h2>
+          <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Volatilite (yıllık)</div><div class="text-lg font-medium tabular-nums">{risk.vol.toFixed(2)}%</div></div>
+            <div class="rounded-lg border p-3"><div class="text-xs text-muted-foreground">Çeşitlendirme oranı</div><div class="text-lg font-medium tabular-nums">{risk.div.toFixed(2)}</div></div>
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground">Çeşitlendirme oranı: fonların ağırlıklı ortalama volatilitesi / portföy volatilitesi; 1 ise fonlar birlikte hareket ediyor, büyüdükçe dağılım riski azaltıyor. Risk katkısı payından çok büyük olan fon turuncu.</p>
+        </section>
+      )}
+
+      {trades.length > 0 && (
+        <section class="mb-8" data-section="dengeleme">
+          <h2 class="mb-3 font-semibold">Yeniden dengeleme <span class="text-xs font-normal text-muted-foreground">hedef ağırlıklara göre{cash > 0 && ` · ${exact(cash)} ek nakit`}{noSell && " · satış yapmadan"}</span></h2>
+          {Math.abs(targetSum - 100) >= 0.01 && <p class="mb-2 text-xs text-amber-600">Hedeflerin toplamı %{targetSum.toLocaleString("tr-TR")}; 100'e oranlandı.</p>}
+          <div class="overflow-x-auto rounded-lg border">
+            <table class="w-full text-sm tabular-nums">
+              <thead class="bg-muted/50 text-right"><tr><th class="p-2 text-left">Fon</th><th class="p-2">Şu an</th><th class="p-2">Pay</th><th class="p-2">Hedef</th><th class="p-2">İşlem</th><th class="p-2">Sonra</th><th class="p-2">Sonra pay</th></tr></thead>
+              <tbody>{trades.map((t) => (
+                <tr class="border-t"><td class="p-2 text-left font-medium">{t.code}</td><td class="p-2 text-right">{exact(t.value)}</td><td class="p-2 text-right">{(w(t.code) * 100).toFixed(1)}%</td><td class="p-2 text-right">{t.target.toFixed(1)}%</td>
+                  <td class={`p-2 text-right font-medium ${tone(t.amount)}`}>{Math.abs(t.amount) < 1 ? "–" : `${t.amount > 0 ? "Al" : "Sat"} ${exact(Math.abs(t.amount))}`}</td><td class="p-2 text-right">{exact(t.after)}</td><td class="p-2 text-right">{((t.after / afterTotal) * 100).toFixed(1)}%</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <p class="mt-2 text-xs text-muted-foreground">Satışlarda stopaj ve fon alım/satım valörü hesaba katılmaz. Hedefi boş bırakılan fon için hedef %0 (satılır{noSell && "; satış yapmadan modunda dokunulmaz"}).</p>
+        </section>
+      )}
 
       {series.length > 20 && (
         <section class="mb-8">

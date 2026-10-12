@@ -15,6 +15,8 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY db ./db
 COPY scripts ./scripts
+# stopaj bekçisi (scripts/stopaj-watch.mjs, stopaj-sources.mjs) taban tabloyu ve bilinen kararları buradan okur
+COPY src/lib/stopaj-rules.mjs ./src/lib/stopaj-rules.mjs
 COPY start.sh ./
 USER node
 EXPOSE 4321

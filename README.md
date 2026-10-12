@@ -16,8 +16,8 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Rakipler ve örtüşme**: aynı kategorideki rakip fonlar, hisse portföyü en çok örtüşen fonlar
 - **Karşılaştırma**: en fazla 10 fon; 100'e endeksli grafik, getiri korelasyonu ve hisse örtüşme matrisi
 - **Hisse arama**: bir hisseyi hangi fonların ne ağırlıkla tuttuğu ve tahmini TL pozisyonu
-- **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans. Adresi paylaşılabilir
-- **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı
+- **Portföyüm**: tutar (₺) ya da adet girerek portföy kur; birleşik varlık dağılımı, hisse maruziyeti, geçmiş performans, portföy volatilitesi ve fon başına risk katkısı, hedef ağırlıklara göre yeniden dengeleme (ek nakit / satış yapmadan). Adresi paylaşılabilir
+- **Simülasyon**: "şu tarihte alsaydım?" Aylık düzenli alım (XIRR) ve tek seferlik alım, fon ve endekslerle kıyaslı; stopaj sonrası net getiri
 - **Hazır taramalar**: en çok kazandıran hisse/BES fonları, düşük riskli yüksek getirili, en çok para girişi/çıkışı, en büyük, altın ve döviz fonları, katılıma uygun fonlar (genel, hisse, BES) (`/tarama`, sunucuda çizilir)
 - **SEO / agent**: sayfa başına açıklama, canonical, Open Graph/Twitter kartı (fon başına dinamik görsel `/og/fon/KOD.png`), JSON-LD; DB'den `sitemap.xml`, AI tarayıcılarına açık `robots.txt`, agent'lar için `llms.txt`. Prod adresi `SITE_URL` (varsayılan canlı demo)
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
@@ -96,8 +96,20 @@ npm run dev          # http://localhost:4321
 | `npm run ingest -- vol` | Volatiliteyi yeniden hesapla |
 | `npm run holdings` | KAP hisse portföylerini çek (her rapor `holdings_hist` geçmişine de yazılır) |
 | `npm run holdings -- gecmis` | Fonların bir önceki KAP raporunu indirip geçmişe yaz ("önceki rapora göre değişim" hemen dolsun; bir kez, yavaş) |
+| `npm run stopaj-watch` | Resmi Gazete'de yeni fon stopajı kararı ara (aşağıya bakın) |
 | `npm test` | Birim testleri (PDF ayrıştırıcı, istatistik) |
 | `npm run test:e2e` | Playwright e2e testleri |
+
+### Stopaj oranları değişince
+
+Simülasyondaki stopaj sonrası net getiri, alış tarihine göre dönemler ve fon grubu başına oranlardan hesaplanır: taban tablo `src/lib/stopaj-rules.mjs`, üstüne kaynaklardan otomatik eklenen dönemler (`stopaj_rule`). Oranlar Cumhurbaşkanı Kararı ile Resmi Gazete'de değişir; kararlar görüntü PDF olduğundan oranlar onları metin olarak yeniden yayımlayan kurumlardan okunur. Anahtar/token gerekmez.
+
+- **Bekçi** (`scripts/stopaj-watch.mjs`, günlük döngüde otomatik):
+  1. Resmi Gazete fihristini tarar, GVK geçici 67 kararlarını `stopaj_karar`'a yazar (bilinmeyen karar: `bekliyor`).
+  2. Kaynakları okur (`scripts/stopaj-sources.mjs`, öncelik sırasıyla): **Ziraat Portföy** stopaj tablosu (ana sayfadaki PDF), **Garanti BBVA** ve **Yapı Kredi** stopaj duyuruları. Bir kaynak, tablodaki tüm geçmiş dönemlerle tutarlıysa güvenilir sayılır ve yalnız son bilinen dönemden **sonraki** yeni dönemleri önerebilir. Güvenilir ilk kaynağın yeni dönemi `stopaj_rule`'a yazılır; güvenilir iki kaynak yeni dönemde ayrışırsa hiçbir şey yazılmaz. Okunamayan/çelişen kaynak atlanır, bayat kaynak zararsızdır.
+  3. Bekleyen karar, yeni dönem uygulanınca `uygulandi`; 30 gün içinde kaynaklarda değişiklik çıkmazsa `etkisiz` (ör. yalnız kurumları ilgilendiren karar) olur.
+- Kayıtlar `stopaj:` önekiyle loglanır (`UYGULANDI: ...`, `... tablo ile çelişiyor`, `... okunamadı`). Kaynak sayfası adres/düzen değiştirirse o kaynak "okunamadı" der, diğerleri işe yarar; düzeltme `stopaj-sources.mjs`'teki ayrıştırıcıdadır.
+- Elle müdahale gerekirse `STOPAJ_RULES`'a satır eklenebilir; etkisiz olduğu bilinen kararlar `REVIEWED`'a. İlk çalıştırma Resmi Gazete'de geriye 30 gün tarar (`node scripts/stopaj-watch.mjs 200` ile daha fazla).
 
 ## Sayfalar ve URL'ler
 
