@@ -14,6 +14,7 @@ const f = await getFund((Astro.params.code ?? "").toUpperCase());
 if (!f) return new Response(null, { status: 404 }); // gövdesiz: Astro 404.astro sayfasını çizer
 const founder = classify(f.name, f.kind).founder;
 const TUR: Record<string, string> = { YAT: "yat", EMK: "bes", BYF: "byf", GYF: "gyf" };
+const ACT = "shrink-0 whitespace-nowrap rounded-full border px-3 py-1 hover:bg-accent";
 const last = f.history[f.history.length - 1];
 const bench = await getBench();
 const benches = BENCH.filter(([s]) => bench[s]?.length);
@@ -58,10 +59,17 @@ const KIND_NAME: Record<string, [string, string]> = { YAT: ["Yatırım Fonları"
     <div class="text-sm text-muted-foreground">{f.kind} · {trDate(last.date)} · {f.active ? "TEFAS'ta aktif" : <span class="font-medium text-red-600">TEFAS'ta pasif {f.tasfiye ? `(tasfiye duyurusu: ${trDate(f.tasfiye)})` : `(son veri ${trDate(last.date)})`}</span>}</div>
     <h1 class="break-words text-xl font-semibold sm:text-2xl">{f.code} <span class="text-base font-normal sm:text-lg text-muted-foreground">{f.name}</span></h1>
     <a class="no-print text-sm underline" href={`/kurucu/${slug(founder)}?tur=${TUR[f.kind] ?? "yat"}`} data-testid="kurucu-link">{founder}</a>
-    <span class="no-print mx-1 text-muted-foreground">·</span><a class="no-print text-sm underline" href={`/karsilastir?codes=${f.code}`}>Karşılaştırmaya ekle</a>
-    {f.kind === "EMK" && <><span class="no-print mx-1 text-muted-foreground">·</span><a class="no-print text-sm underline" href={`/bes-simulasyon?fon=${f.code}`}>BES simülasyonu</a></>}
-    <span class="no-print mx-1 text-muted-foreground">·</span><span class="no-print"><PinButton client:only="react" code={f.code} /></span>
-    <span class="no-print mx-1 text-muted-foreground">·</span><button type="button" class="no-print text-sm underline" onclick="window.print()">PDF olarak indir</button>
+  </div>
+  <!-- Aksiyon çubuğu: fondan sonraki adım (izle, karşılaştır, portföye kat, simüle et). Kaydırırken üstte kalır; data-umami-event tıklamayı sayar. -->
+  <div class="no-print sticky top-0 z-30 -mx-3 mb-6 flex gap-2 overflow-x-auto border-b bg-background/95 px-3 py-2 text-sm backdrop-blur sm:-mx-4 sm:px-4" data-testid="fon-aksiyon">
+    <span class={ACT}><PinButton client:only="react" code={f.code} /></span>
+    <a class={ACT} href={`/karsilastir?codes=${f.code}`} data-umami-event="fon-aksiyon" data-umami-event-tip="karsilastir">Karşılaştırmaya ekle</a>
+    <a class={ACT} href={`/portfoy?ekle=${f.code}`} data-umami-event="fon-aksiyon" data-umami-event-tip="portfoy">Portföye ekle</a>
+    {f.kind === "EMK"
+      ? <a class={ACT} href={`/bes-simulasyon?fon=${f.code}`} data-umami-event="fon-aksiyon" data-umami-event-tip="bes">BES simülasyonu</a>
+      : <a class={ACT} href={`/simulasyon?codes=${f.code}`} data-umami-event="fon-aksiyon" data-umami-event-tip="simulasyon">Simüle et</a>}
+    <a class={ACT} href={`/hedef?fon=${f.code}`} data-umami-event="fon-aksiyon" data-umami-event-tip="hedef">Hedef planla</a>
+    <button type="button" class={ACT} onclick="window.print()" data-umami-event="fon-aksiyon" data-umami-event-tip="pdf">PDF olarak indir</button>
   </div>
 
   <div class="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">

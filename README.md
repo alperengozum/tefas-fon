@@ -21,6 +21,7 @@ Türkiye'deki yatırım, emeklilik (BES), borsa yatırım (BYF) ve girişim serm
 - **Hazır taramalar**: en çok kazandıran hisse/BES fonları, düşük riskli yüksek getirili, en çok para girişi/çıkışı, en büyük, altın ve döviz fonları, katılıma uygun fonlar (genel, hisse, BES) (`/tarama`, sunucuda çizilir)
 - **SEO / agent**: sayfa başına açıklama, canonical, Open Graph/Twitter kartı (fon başına dinamik görsel `/og/fon/KOD.png`), JSON-LD; DB'den `sitemap.xml`, AI tarayıcılarına açık `robots.txt`, agent'lar için `llms.txt`. Prod adresi `SITE_URL` (varsayılan canlı demo)
 - **Pinleme**: fon listelerinde pinlenen fonlar tablonun en üstünde durur (tarayıcıda saklanır)
+- **Fon detayı aksiyon çubuğu**: pinle, karşılaştır, portföye ekle (`/portfoy?ekle=KOD`), simüle et, hedef planla, PDF; kaydırırken üstte kalır
 - **PDF**: fon detayı yazdırılarak PDF'e aktarılır
 - **Mobil uyumlu**: hamburger menü, tek sütun kartlar, dokunmatik grafikler
 - **PWA ve tema**: ana ekrana eklenebilir (manifest, ikonlar), service worker ile daha önce açılan sayfalar çevrimdışı da açılır; Sistem / Açık / Koyu tema düğmesi (tarayıcıda hatırlanır, yazdırırken açık)
@@ -118,7 +119,8 @@ Simülasyondaki stopaj sonrası net getiri, alış tarihine göre dönemler ve f
 - `/karsilastir?codes=A&codes=B`: en fazla 10 fon; `endeks=1` endeks çizgilerini ekler (eski `?codes=A,B` biçimi de çalışır)
 - `/hisse` ve `/hisse/TICKER`: hisseyi tutan fonlar
 - `/portfoy?f=AFT:tl:5000&f=TCD:adet:120`: paylaşılabilir portföy, ayrıca localStorage'a kaydedilir
-- `/simulasyon?codes=AFT&monthly=5000&start=2025-09-21`: alım simülasyonu
+- `/portfoy?ekle=KOD`: fonu kayıtlı portföye boş tutarlı satır olarak ekler
+- `/simulasyon?codes=AFT&monthly=5000&start=2025-09-21`: alım simülasyonu; `/bes-simulasyon` ve `/hedef` ile ortak sekme menüsü
 
 ## Hesaplama notları
 
@@ -145,6 +147,7 @@ Simülasyondaki stopaj sonrası net getiri, alış tarihine göre dönemler ve f
 |---|---|
 | `DATABASE_URL` | Zorunlu. Coolify Postgres iç adresi |
 | `SHOW_DISCLAIMER=1` | Opsiyonel. Header'da "yatırım tavsiyesi değildir" uyarısı gösterir; resmi dağıtımda açık, varsayılan kapalı |
+| `UMAMI_SRC`, `UMAMI_ID` | Opsiyonel. İkisi de verilirse [Umami](https://umami.is) (çerezsiz, self-host) script'i yüklenir: `UMAMI_SRC=https://umami.ornek.com/script.js`, `UMAMI_ID=<website id>`. Gizlilik sayfası buna göre değişir. Olaylar: `fon-aksiyon` (`tip`: pin, karsilastir, portfoy, simulasyon, bes, hedef, pdf), `tarama-cip` (`slug`) |
 
 Domain: `fon.yourapiservice.com` (Cloudflare A kaydı → sunucu IP'si, proxied).
 

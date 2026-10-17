@@ -7,9 +7,18 @@ type Props = { title?: string; description?: string; image?: string; crumbs?: Cr
 const { title = SITE_NAME, description = SITE_DESC, image = "/og-image.png", crumbs = [], noindex = false, path: canonPath = Astro.url.pathname } = Astro.props as Props;
 const canonical = abs(Astro.site, canonPath);
 const img = abs(Astro.site, image);
-const tabs = [["yat", "Yatırım Fonları"], ["bes", "Emeklilik (BES)"], ["byf", "BYF"], ["gyf", "GYF"]];
+// Üst menü: [adres, etiket, aktif sayılan yol önekleri]. Fon türleri, taramalar ve kurucular liste sayfasında; üç hesap aracı tek girişte.
+const nav: [string, string, string[]][] = [
+  ["/fonlar/yat", "Fonlar", ["/fonlar/", "/fon/", "/tarama", "/kurucu"]],
+  ["/karsilastir", "Karşılaştır", ["/karsilastir"]],
+  ["/hisse", "Hisse Ara", ["/hisse"]],
+  ["/portfoy", "Portföyüm", ["/portfoy"]],
+  ["/simulasyon", "Simülasyon", ["/simulasyon", "/bes-simulasyon", "/hedef"]],
+];
 const path = Astro.url.pathname;
 const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
+// Umami (çerezsiz ziyaret istatistiği): ikisi de verilirse yüklenir. data-umami-event özniteliği olan öğelerin tıklamaları olay olarak sayılır.
+const umami = process.env.UMAMI_SRC && process.env.UMAMI_ID ? { src: process.env.UMAMI_SRC, id: process.env.UMAMI_ID } : null;
 ---
 <html lang="tr">
   <head>
@@ -61,6 +70,7 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={img} />
     <script type="application/ld+json" set:html={jsonLd(Astro.site, { path: canonPath, title, description }, crumbs)} />
+    {umami && <script is:inline defer src={umami.src} data-website-id={umami.id} data-do-not-track="true" />}
     <slot name="head" />
   </head>
   <body class="min-h-screen bg-background text-foreground antialiased">
@@ -84,12 +94,10 @@ const showDisclaimer = process.env.SHOW_DISCLAIMER === "1";
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg>
         </button>
         <div id="nav-links" class="absolute inset-x-0 top-full z-40 hidden flex-col gap-1 border-b bg-background p-2 shadow-lg sm:static sm:z-auto sm:flex sm:w-auto sm:flex-row sm:items-center sm:gap-x-6 sm:gap-y-1 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-          {tabs.map(([k, l]) => (
-            <a href={`/fonlar/${k}`} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === `/fonlar/${k}` ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
-          ))}
-          {[["/tarama", "Taramalar"], ["/kurucu", "Kurucular"], ["/karsilastir", "Karşılaştır"], ["/hisse", "Hisse Ara"], ["/portfoy", "Portföyüm"], ["/simulasyon", "Simülasyon"], ["/hedef", "Hedef"]].map(([h, l]) => (
-            <a href={h} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${path === h ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>
-          ))}
+          {nav.map(([h, l, pre]) => {
+            const on = pre.some((p) => path.startsWith(p));
+            return <a href={h} aria-current={on ? "page" : undefined} class={`rounded px-3 py-2 hover:bg-accent sm:rounded-none sm:px-0 sm:py-0 sm:hover:bg-transparent ${on ? "font-medium" : "text-muted-foreground hover:text-foreground"}`}>{l}</a>;
+          })}
         </div>
         <!-- data-tema istemcide doldurulur; simge sırası: sistem -> açık -> koyu -->
         <button id="theme-toggle" type="button" data-tema="sistem" aria-label="Tema: sistem" title="Tema: sistem" class="group rounded p-2 hover:bg-accent sm:ml-auto">

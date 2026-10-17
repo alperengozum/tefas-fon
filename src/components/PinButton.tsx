@@ -17,7 +17,7 @@ export default function PinButton({ code }: { code: string }) {
   const { pins, toggle } = usePins();
   const on = pins.has(code);
   return (
-    <button type="button" aria-pressed={on} onClick={() => toggle(code)} className="inline-flex items-center gap-1 align-middle text-sm underline">
+    <button type="button" aria-pressed={on} onClick={() => toggle(code)} className="inline-flex items-center gap-1 align-middle text-sm" data-umami-event="fon-aksiyon" data-umami-event-tip="pin">
       <PinIcon className={`size-4 ${on ? "fill-current" : ""}`} />{on ? "Pini kaldır" : "Listede pinle"}
     </button>
   );

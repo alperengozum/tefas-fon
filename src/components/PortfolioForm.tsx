@@ -18,16 +18,26 @@ const url = (rows: Row[], x: Extra = { cash: "", noSell: false }) => {
 const SELECT = "h-8 rounded-lg border border-input bg-transparent px-2 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30";
 
 // Portföy girişi: her satırda aranabilir fon seçici + tutar (TL) ya da adet + isteğe bağlı hedef %. Kayıt yalnız bu tarayıcıda (localStorage).
-export default function PortfolioForm({ initial, extra }: { initial: Row[]; extra?: Extra }) {
+// add: fon detayından gelen kod (?ekle=); kayıtlı portföy yüklendikten sonra boş tutarlı satır olarak eklenir ve tutar kutusuna odaklanılır.
+export default function PortfolioForm({ initial, extra, add }: { initial: Row[]; extra?: Extra; add?: string }) {
   const options = useFundOptions();
   const [rows, setRows] = useState<Row[]>(initial.length ? initial : [{ code: null, mode: "tl", value: "" }]);
   const [x, setX] = useState<Extra>(extra ?? { cash: "", noSell: false });
+  const [focus, setFocus] = useState<string | null>(null);
   useEffect(() => {
     try {
       if (initial.length) localStorage.setItem(KEY, JSON.stringify(initial));
-      else { const s = JSON.parse(localStorage.getItem(KEY) ?? "[]") as Row[]; if (s.length) location.replace(url(s)); }
+      else { const s = JSON.parse(localStorage.getItem(KEY) ?? "[]") as Row[]; if (s.length) return location.replace(url(s) + (add ? `&ekle=${add}` : "")); }
     } catch {}
+    if (!add) return;
+    if (!initial.some((r) => r.code === add)) setRows((rs) => [...rs.filter((r) => r.code), { code: add, mode: "tl", value: "" }]);
+    setFocus(add);
   }, []);
+  useEffect(() => {
+    if (!focus) return;
+    document.querySelector<HTMLInputElement>(`[data-testid=portfoy-satir][data-code="${focus}"] input[type=number]`)?.focus();
+    setFocus(null);
+  }, [focus, rows]);
   const set = (i: number, patch: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const price = new Map(options.map((o) => [o.value, o.price]));
   const targetSum = rows.reduce((s, r) => s + (Number(r.target) || 0), 0);
@@ -39,8 +49,9 @@ export default function PortfolioForm({ initial, extra }: { initial: Row[]; extr
   };
   return (
     <form onSubmit={submit} className="mb-6 space-y-2">
+      {add && <p className="text-sm" data-testid="portfoy-eklendi"><b>{add}</b> portföye eklendi: tutarı ya da adedi girip <b>Analiz et</b>'e bas.</p>}
       {rows.map((r, i) => (
-        <div key={i} className="flex flex-wrap items-center gap-2" data-testid="portfoy-satir">
+        <div key={i} className="flex flex-wrap items-center gap-2" data-testid="portfoy-satir" data-code={r.code ?? ""}>
           <div className="w-full min-w-0 sm:w-96"><FundCombobox value={r.code} options={options} onChange={(code) => set(i, { code })} label={`Fon ${i + 1}`} /></div>
           <select aria-label="Giriş türü" value={r.mode} onChange={(e) => set(i, { mode: e.target.value as Row["mode"] })} className={SELECT}>
             <option value="tl">Tutar (₺)</option>

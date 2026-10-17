@@ -1,19 +1,36 @@
 ---
 import Base from "../layouts/Base.astro";
+// Base.astro ile aynı koşul: Umami yüklenmiyorsa metin "analitik yok" der
+const analytics = Boolean(process.env.UMAMI_SRC && process.env.UMAMI_ID);
 ---
 <Base title="Privacy Policy | TEFAS Fon Analiz">
   <div class="mx-auto max-w-2xl space-y-4 text-sm leading-relaxed">
     <h1 class="text-xl font-semibold">Gizlilik Politikası</h1>
-    <p class="text-xs text-muted-foreground">Son güncelleme: 22 Eylül 2026</p>
+    <p class="text-xs text-muted-foreground">Son güncelleme: 17 Ekim 2026</p>
 
-    <section>
-      <h2 class="font-medium mb-1">Hesap ve takip yok</h2>
-      <p>
-        Sitede kullanıcı hesabı, giriş sistemi, çerez tabanlı takip veya
-        analitik (Google Analytics vb.) yoktur. Kişisel veri toplanmaz,
-        işlenmez veya üçüncü taraflarla paylaşılmaz.
-      </p>
-    </section>
+    {analytics ? (
+      <section>
+        <h2 class="font-medium mb-1">Hesap yok, çerezsiz istatistik</h2>
+        <p>
+          Sitede kullanıcı hesabı, giriş sistemi veya çerez tabanlı takip
+          yoktur. Hangi sayfaların ve özelliklerin kullanıldığını anlamak için
+          kendi sunucumuzda çalışan, çerez kullanmayan Umami ile anonim ziyaret
+          istatistiği tutulur: ziyaret edilen sayfa, yönlendiren site, tarayıcı/cihaz
+          türü, ülke ve bazı düğme tıklamaları. IP adresi saklanmaz, ziyaretçiler
+          siteler arası izlenmez, veriler üçüncü taraflarla paylaşılmaz. Tarayıcınızda
+          "Do Not Track" açıksa istatistik hiç gönderilmez.
+        </p>
+      </section>
+    ) : (
+      <section>
+        <h2 class="font-medium mb-1">Hesap ve takip yok</h2>
+        <p>
+          Sitede kullanıcı hesabı, giriş sistemi, çerez tabanlı takip veya
+          analitik (Google Analytics vb.) yoktur. Kişisel veri toplanmaz,
+          işlenmez veya üçüncü taraflarla paylaşılmaz.
+        </p>
+      </section>
+    )}
 
     <section>
       <h2 class="font-medium mb-1">Tarayıcıda yerel depolama</h2>

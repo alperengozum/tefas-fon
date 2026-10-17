@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import CalcTabs from "../components/CalcTabs.astro";
 import FundPicker from "../components/FundCombobox";
 import { getFund } from "../lib/db";
 import { dailyReturns } from "../lib/stats";
@@ -30,6 +31,7 @@ const end = s?.yearly.at(-1);
 const unit = inflPct ? "bugünün parasıyla" : "nominal TL";
 ---
 <Base title="Hedef planlayıcı · TEFAS Fon Analiz" description="Ayda şu kadar biriktirirsem N yılda hedefime ulaşır mıyım? Fonun geçmiş getirilerinden Monte Carlo senaryolarıyla olasılık ve gereken aylık tutar." noindex={Astro.url.search !== ""}>
+  <CalcTabs fon={code || undefined} />
   <h1 class="mb-1 text-xl font-semibold">Hedef planlayıcı</h1>
   <p class="mb-4 text-sm text-muted-foreground">"Ayda X ₺ ile N yılda hedefime ulaşır mıyım?" Seçtiğin fonun son 1 yıllık günlük getirileri aylık bloklar halinde rastgele yeniden dizilerek {N.toLocaleString("tr-TR")} senaryo üretilir; sonuç bir aralık ve olasılıktır, tahmin değil.</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">
