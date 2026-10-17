@@ -9,6 +9,7 @@ const KINDS: Record<string, [string, string]> = {
   yat: ["YAT", "Yatırım Fonları"], bes: ["EMK", "Emeklilik Fonları (BES)"],
   byf: ["BYF", "Borsa Yatırım Fonları"], gyf: ["GYF", "Gayrimenkul Yatırım Fonları"],
 };
+const TABS: Record<string, string> = { yat: "Yatırım", bes: "Emeklilik (BES)", byf: "BYF", gyf: "GYF" };
 const k = KINDS[Astro.params.tur ?? ""];
 if (!k) return new Response(null, { status: 404 });
 const { ref, funds } = await listFunds(k[0]);
@@ -20,12 +21,17 @@ const scans = SCANS.filter((s) => s.kind === k[0]);
     <h1 class="text-xl font-semibold">{k[1]}</h1>
     <span class="text-sm text-muted-foreground">Veri tarihi: {trDate(ref)} · {funds.filter((f) => f.active).length} aktif fon</span>
   </div>
-  {scans.length > 0 && (
-    <div class="mb-3 hidden flex-wrap items-center gap-2 text-xs sm:flex" data-testid="hazir-taramalar">
-      <span class="text-muted-foreground">Hazır taramalar:</span>
-      {scans.map((s) => <a class="max-w-full truncate rounded-full border px-2 py-0.5 hover:bg-accent" href={`/tarama/${s.slug}`}>{s.title}</a>)}
-    </div>
-  )}
+  <nav class="mb-3 flex flex-wrap gap-2 text-sm" aria-label="Fon türü">
+    {Object.entries(TABS).map(([t, l]) => <a href={`/fonlar/${t}`} class={`rounded-full border px-3 py-1 ${t === Astro.params.tur ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`} aria-current={t === Astro.params.tur ? "page" : undefined}>{l}</a>)}
+  </nav>
+  <!-- mobilde tek satır, yatay kaydırılır (sayfa taşmasın diye kapsayıcı kendi içinde kayar) -->
+  <div class="mb-3 flex items-center gap-2 overflow-x-auto pb-1 text-xs sm:flex-wrap sm:overflow-visible sm:pb-0" data-testid="hazir-taramalar">
+    {scans.length > 0 && <span class="shrink-0 text-muted-foreground">Hazır taramalar:</span>}
+    {scans.map((s) => <a class="shrink-0 rounded-full border px-2 py-0.5 hover:bg-accent sm:max-w-full sm:shrink sm:truncate" href={`/tarama/${s.slug}`} data-umami-event="tarama-cip" data-umami-event-slug={s.slug}>{s.title}</a>)}
+    <a class="shrink-0 underline" href="/tarama">Tüm taramalar</a>
+    <span class="shrink-0 text-muted-foreground">·</span>
+    <a class="shrink-0 underline" href={`/kurucu?tur=${Astro.params.tur}`}>Kurucular</a>
+  </div>
   {funds.length === 0
     ? <p class="text-muted-foreground">Veri henüz yüklenmedi; ilk yükleme ~20 dk sürer (TEFAS rate limit). Sayfayı sonra yenileyin.</p>
     : <FundTable client:only="react" src={`/api/funds/${Astro.params.tur}`} />}

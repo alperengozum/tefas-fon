@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import CalcTabs from "../components/CalcTabs.astro";
 import FundPicker from "../components/FundCombobox";
 import { getBench, getFunds, getStopajRules, type Detail } from "../lib/db";
 import { BENCH } from "../lib/analytics";
@@ -37,6 +38,7 @@ const rows = [
 const missing = codes.filter((c) => !funds.some((f) => f.code === c));
 ---
 <Base title="Simülasyon · TEFAS Fon Analiz" description="Geçmişte şu fonu alsaydım ne olurdu? Aylık düzenli alım (XIRR) ve tek seferlik alım simülasyonu, endekslerle kıyaslı." noindex={Astro.url.search !== ""}>
+  <CalcTabs fon={codes[0]} />
   <h1 class="mb-1 text-xl font-semibold">Yatırım simülasyonu</h1>
   <p class="mb-4 text-sm text-muted-foreground">"Geçmişte şunu alsaydım ne olurdu?" Aylık düzenli alım (SIP) ve tek seferlik alımı fon ve endekslerle kıyaslar. Geçmiş getiri gelecek getiriyi garanti etmez; fon masrafı fiyata zaten yansır, stopaj sonrası net getiri ayrı sütunda. Emeklilik fonları için devlet katkısı ve hak edişli <a class="underline" href="/bes-simulasyon">BES simülasyonu</a>; ileriye dönük "hedefime ulaşır mıyım?" için <a class="underline" href="/hedef">hedef planlayıcı</a>.</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">

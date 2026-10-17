@@ -17,6 +17,8 @@ const entered = Astro.url.searchParams.getAll("f").flatMap((s) => {
   const n = Number(v), tg = Number(t);
   return c && (m === "tl" || m === "adet") && n > 0 ? [{ code: c.toUpperCase(), mode: m as "tl" | "adet", value: n, target: tg > 0 ? tg : 0 }] : [];
 }).slice(0, 15);
+// ?ekle=KOD: fon detayından "Portföye ekle"; kayıtlı portföye yeni satır olarak eklenir, tutarı kullanıcı girer
+const add = (Astro.url.searchParams.get("ekle") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10) || undefined;
 const cash = Math.min(Math.max(Number(Astro.url.searchParams.get("nakit")) || 0, 0), 1e12);
 const noSell = Astro.url.searchParams.get("satma") === "1";
 const codes = [...new Set(entered.map((e) => e.code))];
@@ -76,7 +78,7 @@ const exact = (v: number) => `${Math.round(v).toLocaleString("tr-TR")} ₺`;
 <Base title="Portföyüm · TEFAS Fon Analiz" description="Fon portföyünüzü kurun: birleşik varlık dağılımı, hisse maruziyeti, fonlar arası örtüşme ve geçmiş performans." noindex={Astro.url.search !== ""}>
   <h1 class="mb-1 text-xl font-semibold">Portföyüm</h1>
   <p class="mb-4 text-sm text-muted-foreground">Fonlarını seç, tutar (₺) ya da adet (pay) gir; birleşik varlık dağılımı, hisse maruziyeti ve fonlar arası örtüşme çıkar. Kayıt yalnız bu tarayıcıda tutulur; adres paylaşılabilir.</p>
-  <PortfolioForm client:only="react" initial={initial} extra={{ cash: cash ? String(cash) : "", noSell }} />
+  <PortfolioForm client:only="react" initial={initial} extra={{ cash: cash ? String(cash) : "", noSell }} add={add} />
   {missing.length > 0 && <p class="mb-3 text-sm text-red-600">Bulunamadı: {missing.join(", ")}</p>}
   {funds.length === 0 ? <p class="text-muted-foreground">Analiz için en az bir fon ve tutar girin.</p> : (
     <>

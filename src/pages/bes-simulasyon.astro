@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import CalcTabs from "../components/CalcTabs.astro";
 import FundPicker from "../components/FundCombobox";
 import { getFunds, listFunds } from "../lib/db";
 import { DK_RULES, simulateBes } from "../lib/bes";
@@ -36,6 +37,7 @@ const r = fund ? simulateBes(fund.history, dkFund!.history, monthly, start, end,
 const rate = DK_RULES.at(-1)!;
 ---
 <Base title="BES simülasyonu · TEFAS Fon Analiz" description="Bireysel emeklilikte aylık katkı, devlet katkısı (%20 / %30, yıllık tavan) ve hak ediş ile geçmişte şu BES fonunu seçseydim ne olurdu?" noindex={Astro.url.search !== ""}>
+  <CalcTabs fon={code || undefined} />
   <h1 class="mb-1 text-xl font-semibold">BES simülasyonu</h1>
   <p class="mb-4 text-sm text-muted-foreground">Seçtiğin emeklilik fonuna her ay düzenli katkı; devlet katkısı (DK) yıllık tavana kadar şirketin devlet katkısı fonuna yatırılır, çekebileceğin kısmı sistemdeki süreye ve yaşa bağlıdır. Geçmiş getiri geleceği garanti etmez.</p>
   <form class="mb-6 flex flex-wrap items-end gap-3 text-sm" method="get">

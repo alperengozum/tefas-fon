@@ -1,0 +1,12 @@
+---
+// Üç hesap aracı (geçmiş simülasyon, BES, hedef) üst menüde tek giriş: aralarında bu sekmelerle geçilir.
+// fon: seçili fon simülasyon/hedefe taşınır; BES'e taşınmaz (yatırım fonu orada geçersiz).
+type Props = { fon?: string };
+const { fon } = Astro.props as Props;
+const path = Astro.url.pathname;
+const q = (k: string) => (fon ? `?${k}=${encodeURIComponent(fon)}` : "");
+const tabs = [[`/simulasyon${q("codes")}`, "/simulasyon", "Geçmiş simülasyon"], ["/bes-simulasyon", "/bes-simulasyon", "BES simülasyonu"], [`/hedef${q("fon")}`, "/hedef", "Hedef planlayıcı"]];
+---
+<nav class="no-print mb-4 flex flex-wrap gap-2 text-sm" aria-label="Hesap aracı">
+  {tabs.map(([h, p, l]) => <a href={h} class={`rounded-full border px-3 py-1 ${path === p ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`} aria-current={path === p ? "page" : undefined}>{l}</a>)}
+</nav>
