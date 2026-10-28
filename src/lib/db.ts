@@ -97,19 +97,24 @@ export type Detail = {
   active?: boolean; tasfiye?: string | null; allocKap?: boolean; // sadece getFund doldurur
 };
 
+// Fon başına tam fiyat geçmişi. Ağır okuma bu (soğukta binlerce satır); getFund ve getFunds aynı kaydı paylaşır,
+// böylece portföy/karşılaştırma/rakip tablosundaki her yeni fon kombinasyonu sıcak fonları yeniden okumaz.
+const historyOf = cached(async (code: string): Promise<(Detail["history"][number] & { kind: string; name: string })[]> =>
+  (await pool.query(`SELECT kind, name, date::text, price, size, investors, shares FROM info WHERE code=$1 ORDER BY date`, [code])).rows, (code) => code);
+
 export const getFund = cached(async (code: string): Promise<Detail | null> => {
   const [h, a, ref, liq] = await Promise.all([
-    pool.query(`SELECT kind, name, date::text, price, size, investors, shares FROM info WHERE code=$1 ORDER BY date`, [code]),
+    historyOf(code),
     // hisse portföyü varsa varlık dağılımı da KAP raporunun dönem sonundan (aynı güne ait olsun), yoksa son iş günü
     pool.query(`SELECT COALESCE(m.alloc_date, a.date)::text AS date, COALESCE(m.alloc, a.data) AS data, m.alloc IS NOT NULL AS kap
       FROM alloc a LEFT JOIN holdings_meta m ON m.code = a.code WHERE a.code=$1`, [code]),
     pool.query(`SELECT (max(date) - ${ACTIVE_DAYS})::text AS min FROM info`),
     pool.query(`SELECT min(published)::text AS d FROM kap_notif WHERE code=$1 AND subject='Fon Tasfiye Duyurusu'`, [code]),
   ]);
-  if (!h.rows.length) return null;
-  const last = h.rows[h.rows.length - 1];
+  if (!h.length) return null;
+  const last = h[h.length - 1];
   const tasfiye = liq.rows[0]?.d ?? null;
-  return { code, name: last.name, kind: last.kind, history: h.rows, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, allocKap: a.rows[0]?.kap ?? false, active: last.date >= ref.rows[0].min && !tasfiye, tasfiye };
+  return { code, name: last.name, kind: last.kind, history: h, alloc: a.rows[0]?.data ?? {}, allocDate: a.rows[0]?.date ?? null, allocKap: a.rows[0]?.kap ?? false, active: last.date >= ref.rows[0].min && !tasfiye, tasfiye };
 }, (code) => code);
 
 // Rakip analizi: aynı türde, varlık dağılımı en yakın fonlar (öklid mesafesi)
@@ -161,16 +166,15 @@ export const fundsHolding = cached(async (ticker: string, min: number): Promise<
   return Object.fromEntries(rows.map((r) => [r.code, r.weight]));
 }, (ticker, min) => `${ticker}|${min}`);
 
-// Karşılaştırma için toplu okuma: fon başına ayrı sorgu yerine 3 sorgu (geçmiş, dağılım, hisseler).
+// Karşılaştırma için toplu okuma: geçmiş fon başına önbellekten (historyOf), dağılım ve hisseler toplu 2 ucuz sorgu.
 export const getFunds = cached(async (codes: string[]): Promise<{ funds: Detail[]; holdings: Map<string, Holding[]> }> => {
   if (!codes.length) return { funds: [], holdings: new Map() };
-  const [h, a, hl] = await Promise.all([
-    pool.query(`SELECT code, kind, name, date::text, price, size, investors, shares FROM info WHERE code = ANY($1) ORDER BY code, date`, [codes]),
+  const [hs, a, hl] = await Promise.all([
+    Promise.all(codes.map(historyOf)),
     pool.query(`SELECT code, date::text, data FROM alloc WHERE code = ANY($1)`, [codes]),
     pool.query(`SELECT code, ticker, weight FROM holdings WHERE code = ANY($1) ORDER BY weight DESC`, [codes]),
   ]);
-  const hist = new Map<string, any[]>(), alloc = new Map(a.rows.map((r) => [r.code, r]));
-  for (const r of h.rows) (hist.get(r.code) ?? hist.set(r.code, []).get(r.code)!).push(r);
+  const hist = new Map(codes.flatMap((c, i) => (hs[i].length ? [[c, hs[i]] as const] : []))), alloc = new Map(a.rows.map((r) => [r.code, r]));
   const holdings = new Map<string, Holding[]>();
   for (const r of hl.rows) (holdings.get(r.code) ?? holdings.set(r.code, []).get(r.code)!).push({ ticker: r.ticker, weight: r.weight });
   const funds = codes.filter((c) => hist.has(c)).map((code) => {
