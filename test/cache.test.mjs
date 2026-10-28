@@ -34,3 +34,15 @@ test("hata önbelleklenmez", async () => {
   await assert.rejects(f());
   assert.equal(await f(), 1);
 });
+
+test("refresh her anahtarı yeniden hesaplar, yenisi gelene kadar eskisi döner", async () => {
+  let v = 1, calls = 0;
+  const f = cached(async (k) => { calls++; return `${k}${v}`; }, (k) => k, 1000, 10, () => 0);
+  assert.equal(await f("a"), "a1");
+  v = 2;
+  const r = f.refresh();
+  assert.equal(await f("a"), "a1"); // yenileme sürerken eski değer
+  await r;
+  assert.equal(await f("a"), "a2");
+  assert.equal(calls, 2);
+});

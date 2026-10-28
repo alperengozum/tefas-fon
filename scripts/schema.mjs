@@ -13,5 +13,8 @@ export async function applySchema(db) {
   } catch (e) { await c.query("ROLLBACK").catch(() => {}); throw e; } finally { c.release(); }
 }
 
+// Yazım bitti: web süreci veri sürümünün değiştiğini görüp önbelleği boşaltsın (src/lib/db.ts checkVersion)
+export const bumpVersion = (db) => db.query("INSERT INTO data_version VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET at = now()");
+
 // konteyner öldürülünce TCP kapanmadan kalan oturum, transaction ortasındaysa kilitlerini saatlerce tutmasın
 export const POOL_OPTS = { keepAlive: true, idle_in_transaction_session_timeout: 120000 };

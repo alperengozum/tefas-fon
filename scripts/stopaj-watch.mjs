@@ -5,6 +5,7 @@
 //    ayrışan kaynaklar) hiçbir şey yazılmaz, mevcut oranlar geçerli kalır. Anahtar/token gerekmez.
 // 3) Bekleyen kararı kaynaklarda yeni dönem çıkınca "uygulandi", 30 gün çıkmazsa "etkisiz" sayar (ör. yalnız kurumları ilgilendiren karar).
 import pg from "pg";
+import { bumpVersion } from "./schema.mjs";
 import { readFileSync } from "node:fs";
 import { fetchDay, parseFihrist } from "./resmigazete.mjs";
 import { decide } from "./stopaj-sources.mjs";
@@ -55,4 +56,5 @@ const { rows: stale } = await db.query("UPDATE stopaj_karar SET status = 'etkisi
 for (const k of stale) log(`karar ${k.karar}: 30 gündür kaynaklarda yeni dönem yok, gerçek kişi fon oranını etkilemediği varsayıldı`);
 const { rows: waiting } = await db.query("SELECT karar, day::text FROM stopaj_karar WHERE status = 'bekliyor' ORDER BY day");
 for (const k of waiting) log(`karar ${k.karar} (${k.day}) bekliyor: kaynaklarda henüz yeni dönem yok`);
+await bumpVersion(db);
 await db.end();
