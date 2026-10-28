@@ -9,6 +9,7 @@
 // PDF metninde hangi bilinen fon adlarının (harfiyen) geçtiğine bakıyoruz — "tasfiye ettirilmesine" ibaresi
 // geçmeyen bültenlerde hiç aramıyoruz, o yüzden alakasız bültenlerde yanlış eşleşme riski yok.
 import pg from "pg";
+import { bumpVersion } from "./schema.mjs";
 import { readFileSync } from "node:fs";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
@@ -65,6 +66,7 @@ async function main() {
     }
     await db.query("INSERT INTO spk_bulten_scanned VALUES ($1) ON CONFLICT DO NOTHING", [b.no]);
   }
+  await bumpVersion(db);
   await db.end();
 }
 await main();

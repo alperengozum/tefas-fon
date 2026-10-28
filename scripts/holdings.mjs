@@ -3,7 +3,7 @@
 import pg from "pg";
 import { pathToFileURL } from "node:url";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { POOL_OPTS, applySchema } from "./schema.mjs";
+import { POOL_OPTS, applySchema, bumpVersion } from "./schema.mjs";
 import { allocData, post } from "./tefas.mjs";
 
 const KAP = "https://www.kap.org.tr/tr/";
@@ -238,7 +238,7 @@ async function main() {
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas", ...POOL_OPTS });
   await applySchema(db);
   await seedHist(db);
-  if (process.argv[2] === "gecmis") { await backfillPrev(db); await db.end(); return; }
+  if (process.argv[2] === "gecmis") { await backfillPrev(db); await bumpVersion(db); await db.end(); return; }
   // aylık raporlayan fonlar için 75 gün geriye bak (günlük pencere başına 1 istek)
   const days = Number(process.argv[2] ?? 75);
   // sadece hisse tutan fonlar (TEFAS dağılımında hisse > 0)
@@ -281,6 +281,7 @@ async function main() {
   }));
   console.log(`bitti: ${done - skipped} fon okundu, ${skipped} atlandı (düzen tanınmadı), ${failed} hata`);
   await reportAlloc(db);
+  await bumpVersion(db);
   await db.end();
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

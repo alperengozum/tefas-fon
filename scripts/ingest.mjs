@@ -1,6 +1,6 @@
 // TEFAS yeni JSON API'sinden (auth'suz) fon verisi çeker: node scripts/ingest.mjs [gün=400]
 import pg from "pg";
-import { POOL_OPTS, applySchema } from "./schema.mjs";
+import { POOL_OPTS, applySchema, bumpVersion } from "./schema.mjs";
 import { HDR, allocData, post, ymd } from "./tefas.mjs";
 
 const KINDS = ["YAT", "EMK", "BYF", "GYF", "GSYF"];
@@ -10,8 +10,8 @@ if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) throw ne
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://tefas:tefas@localhost/tefas", ...POOL_OPTS });
 await applySchema(db);
 if (process.argv[2] === "init") { await db.end(); process.exit(0); } // sadece şema
-if (process.argv[2] === "vol") { await computeVol(); await db.end(); process.exit(0); } // sadece volatilite
-if (process.argv[2] === "bench") { await fetchBench(); await db.end(); process.exit(0); } // sadece benchmark
+if (process.argv[2] === "vol") { await computeVol(); await bumpVersion(db); await db.end(); process.exit(0); } // sadece volatilite
+if (process.argv[2] === "bench") { await fetchBench(); await bumpVersion(db); await db.end(); process.exit(0); } // sadece benchmark
 
 // Yıllık volatilite: son 1 yılın günlük getiri std sapması x sqrt(252); en büyük düşüş: fiyatın o güne kadarki zirvesine
 // göre en düşük oranı (fiyat 0 = açıklanmadı, atlanır). Tüm fonlar tek geçişte, listeleme sayfası sadece okur.
@@ -115,4 +115,5 @@ for (const kind of KINDS) {
 }
 await computeVol();
 await fetchBench();
+await bumpVersion(db);
 await db.end();
